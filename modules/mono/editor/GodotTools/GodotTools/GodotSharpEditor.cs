@@ -635,7 +635,7 @@ namespace GodotTools
             MSBuildPanel.BuildStateChanged -= BuildStateChanged;
         }
 
-        public override void _ExitTree()
+        public override void OnExitTree()
         {
             _errorDialog?.QueueFree();
             _confirmCreateSlnDialog?.QueueFree();

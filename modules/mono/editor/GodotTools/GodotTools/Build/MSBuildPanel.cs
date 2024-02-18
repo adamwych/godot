@@ -201,9 +201,9 @@ namespace GodotTools.Build
             }
         }
 
-        public override void _Ready()
+        public override void OnReady()
         {
-            base._Ready();
+            base.OnReady();
 
             var bottomPanelStylebox = EditorInterface.Singleton.GetBaseControl().GetThemeStylebox("BottomPanel", "EditorStyles");
             AddThemeConstantOverride("margin_top", -(int)bottomPanelStylebox.ContentMarginTop);

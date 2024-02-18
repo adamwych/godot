@@ -41,9 +41,9 @@ namespace GodotTools
             _watchTimer.Start();
         }
 
-        public override void _Ready()
+        public override void OnReady()
         {
-            base._Ready();
+            base.OnReady();
 
             _watchTimer = new Timer
             {

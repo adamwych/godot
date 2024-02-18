@@ -3257,6 +3257,18 @@ bool BindingsGenerator::_populate_object_type_interfaces() {
 
 			imethod.proxy_name = escape_csharp_keyword(snake_to_pascal_case(imethod.name));
 
+			if (imethod.proxy_name == "_Ready"
+				|| imethod.proxy_name == "_EnterTree"
+				|| imethod.proxy_name == "_ExitTree"
+				|| imethod.proxy_name == "_Process"
+				|| imethod.proxy_name == "_PhysicsProcess"
+				|| imethod.proxy_name == "_Input"
+				|| imethod.proxy_name == "_ShortcutInput"
+				|| imethod.proxy_name == "_UnhandledInput"
+				|| imethod.proxy_name == "_UnhandledKeyInput") {
+				imethod.proxy_name = "On" + imethod.proxy_name.substr(1);
+			}
+
 			// Prevent the method and its enclosing type from sharing the same name
 			if (imethod.proxy_name == itype.proxy_name) {
 				_log("Name of method '%s' is ambiguous with the name of its enclosing class '%s'. Renaming method to '%s_'\n",

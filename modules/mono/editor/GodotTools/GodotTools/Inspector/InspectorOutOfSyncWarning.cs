@@ -5,7 +5,7 @@ namespace GodotTools.Inspector
 {
     public partial class InspectorOutOfSyncWarning : HBoxContainer
     {
-        public override void _Ready()
+        public override void OnReady()
         {
             SetAnchorsPreset(LayoutPreset.TopWide);
 

@@ -7,11 +7,11 @@ namespace Godot.SourceGenerators.Sample
         private NodePath _nodePath;
         private int _velocity;
 
-        public override void _Process(double delta)
+        public override void OnProcess(double delta)
         {
             _ = delta;
 
-            base._Process(delta);
+            base.OnProcess(delta);
         }
 
         public int Bazz(StringName name)
