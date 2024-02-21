@@ -661,13 +661,6 @@ bool AnimationMixer::_update_caches() {
 				Ref<Resource> resource;
 				Vector<StringName> leftover_path;
 
-				if (!parent->has_node_and_resource(path)) {
-					if (check_path) {
-						WARN_PRINT_ED(mixer_name + ": '" + String(E) + "', couldn't resolve track:  '" + String(path) + "'. This warning can be disabled in Project Settings.");
-					}
-					continue;
-				}
-
 				Node *child = parent->get_node_and_resource(path, resource, leftover_path);
 				if (!child) {
 					if (check_path) {
@@ -1974,7 +1967,13 @@ void AnimationMixer::_build_backup_track_cache() {
 				TrackCacheValue *t = static_cast<TrackCacheValue *>(track);
 				Object *t_obj = ObjectDB::get_instance(t->object_id);
 				if (t_obj) {
-					t->value = t_obj->get_indexed(t->subpath);
+					t->value = Animation::cast_to_blendwise(t_obj->get_indexed(t->subpath));
+				}
+				t->use_discrete = false;
+				if (t->init_value.is_array()) {
+					t->element_size = MAX(t->element_size.operator int(), (t->value.operator Array()).size());
+				} else if (t->init_value.is_string()) {
+					t->element_size = (real_t)(t->value.operator Array()).size();
 				}
 			} break;
 			case Animation::TYPE_AUDIO: {
