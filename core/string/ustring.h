@@ -43,7 +43,7 @@
 /*  CharProxy                                                            */
 /*************************************************************************/
 
-template <class T>
+template <typename T>
 class CharProxy {
 	friend class Char16String;
 	friend class CharString;
@@ -265,6 +265,9 @@ public:
 	signed char nocasecmp_to(const String &p_str) const;
 	signed char naturalcasecmp_to(const String &p_str) const;
 	signed char naturalnocasecmp_to(const String &p_str) const;
+	// Special sorting for file names. Names starting with `_` are put before all others except those starting with `.`, otherwise natural comparison is used.
+	signed char filecasecmp_to(const String &p_str) const;
+	signed char filenocasecmp_to(const String &p_str) const;
 
 	const char32_t *get_data() const;
 	/* standard size stuff */
@@ -499,6 +502,12 @@ struct NaturalNoCaseComparator {
 	}
 };
 
+struct FileNoCaseComparator {
+	bool operator()(const String &p_a, const String &p_b) const {
+		return p_a.filenocasecmp_to(p_b) < 0;
+	}
+};
+
 template <typename L, typename R>
 _FORCE_INLINE_ bool is_str_less(const L *l_ptr, const R *r_ptr) {
 	while (true) {
@@ -602,13 +611,13 @@ _FORCE_INLINE_ void sarray_add_str(Vector<String> &arr, const String &p_str) {
 	arr.push_back(p_str);
 }
 
-template <class... P>
+template <typename... P>
 _FORCE_INLINE_ void sarray_add_str(Vector<String> &arr, const String &p_str, P... p_args) {
 	arr.push_back(p_str);
 	sarray_add_str(arr, p_args...);
 }
 
-template <class... P>
+template <typename... P>
 _FORCE_INLINE_ Vector<String> sarray(P... p_args) {
 	Vector<String> arr;
 	sarray_add_str(arr, p_args...);

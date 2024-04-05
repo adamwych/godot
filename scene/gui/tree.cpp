@@ -691,7 +691,7 @@ bool TreeItem::_is_any_collapsed(bool p_only_visible) {
 }
 
 bool TreeItem::is_any_collapsed(bool p_only_visible) {
-	if (p_only_visible && !is_visible()) {
+	if (p_only_visible && !is_visible_in_tree()) {
 		return false;
 	}
 
@@ -712,10 +712,29 @@ void TreeItem::set_visible(bool p_visible) {
 		tree->queue_redraw();
 		_changed_notify();
 	}
+
+	_handle_visibility_changed(p_visible);
 }
 
 bool TreeItem::is_visible() {
 	return visible;
+}
+
+bool TreeItem::is_visible_in_tree() const {
+	return visible && parent_visible_in_tree;
+}
+
+void TreeItem::_handle_visibility_changed(bool p_visible) {
+	TreeItem *child = get_first_child();
+	while (child) {
+		child->_propagate_visibility_changed(p_visible);
+		child = child->get_next();
+	}
+}
+
+void TreeItem::_propagate_visibility_changed(bool p_parent_visible_in_tree) {
+	parent_visible_in_tree = p_parent_visible_in_tree;
+	_handle_visibility_changed(p_parent_visible_in_tree);
 }
 
 void TreeItem::uncollapse_tree() {
@@ -788,6 +807,7 @@ TreeItem *TreeItem::create_child(int p_index) {
 	}
 
 	ti->parent = this;
+	ti->parent_visible_in_tree = is_visible_in_tree();
 
 	return ti;
 }
@@ -799,6 +819,8 @@ void TreeItem::add_child(TreeItem *p_item) {
 
 	p_item->_change_tree(tree);
 	p_item->parent = this;
+	p_item->parent_visible_in_tree = is_visible_in_tree();
+	p_item->_handle_visibility_changed(p_item->parent_visible_in_tree);
 
 	TreeItem *item_prev = first_child;
 	while (item_prev && item_prev->next) {
@@ -906,7 +928,7 @@ TreeItem *TreeItem::_get_prev_in_tree(bool p_wrap, bool p_include_invisible) {
 TreeItem *TreeItem::get_prev_visible(bool p_wrap) {
 	TreeItem *loop = this;
 	TreeItem *prev_item = _get_prev_in_tree(p_wrap);
-	while (prev_item && !prev_item->is_visible()) {
+	while (prev_item && !prev_item->is_visible_in_tree()) {
 		prev_item = prev_item->_get_prev_in_tree(p_wrap);
 		if (prev_item == loop) {
 			// Check that we haven't looped all the way around to the start.
@@ -947,7 +969,7 @@ TreeItem *TreeItem::_get_next_in_tree(bool p_wrap, bool p_include_invisible) {
 TreeItem *TreeItem::get_next_visible(bool p_wrap) {
 	TreeItem *loop = this;
 	TreeItem *next_item = _get_next_in_tree(p_wrap);
-	while (next_item && !next_item->is_visible()) {
+	while (next_item && !next_item->is_visible_in_tree()) {
 		next_item = next_item->_get_next_in_tree(p_wrap);
 		if (next_item == loop) {
 			// Check that we haven't looped all the way around to the start.
@@ -1641,6 +1663,7 @@ void TreeItem::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_visible", "enable"), &TreeItem::set_visible);
 	ClassDB::bind_method(D_METHOD("is_visible"), &TreeItem::is_visible);
+	ClassDB::bind_method(D_METHOD("is_visible_in_tree"), &TreeItem::is_visible_in_tree);
 
 	ClassDB::bind_method(D_METHOD("uncollapse_tree"), &TreeItem::uncollapse_tree);
 
@@ -1790,7 +1813,7 @@ Size2 Tree::_get_cell_icon_size(const TreeItem::Cell &p_cell) const {
 }
 
 int Tree::compute_item_height(TreeItem *p_item) const {
-	if ((p_item == root && hide_root) || !p_item->is_visible()) {
+	if ((p_item == root && hide_root) || !p_item->is_visible_in_tree()) {
 		return 0;
 	}
 
@@ -1848,7 +1871,7 @@ int Tree::compute_item_height(TreeItem *p_item) const {
 }
 
 int Tree::get_item_height(TreeItem *p_item) const {
-	if (!p_item->is_visible()) {
+	if (!p_item->is_visible_in_tree()) {
 		return 0;
 	}
 	int height = compute_item_height(p_item);
@@ -2050,7 +2073,7 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 		return -1; //draw no more!
 	}
 
-	if (!p_item->is_visible()) {
+	if (!p_item->is_visible_in_tree()) {
 		return 0;
 	}
 
@@ -2172,9 +2195,8 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 			if ((select_mode == SELECT_ROW && selected_item == p_item) || p_item->cells[i].selected || !p_item->has_meta("__focus_rect")) {
 				Rect2i r = cell_rect;
 
-				p_item->set_meta("__focus_rect", Rect2(r.position, r.size));
-
 				if (select_mode != SELECT_ROW) {
+					p_item->set_meta("__focus_rect", Rect2(r.position, r.size));
 					if (rtl) {
 						r.position.x = get_size().width - r.position.x - r.size.x;
 					}
@@ -2185,6 +2207,8 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 							theme_cache.selected->draw(ci, r);
 						}
 					}
+				} else {
+					p_item->set_meta("__focus_col_" + itos(i), Rect2(r.position, r.size));
 				}
 			}
 
@@ -2507,7 +2531,7 @@ int Tree::draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 
 			}
 
 			// Draw relationship lines.
-			if (theme_cache.draw_relationship_lines > 0 && (!hide_root || c->parent != root) && c->is_visible()) {
+			if (theme_cache.draw_relationship_lines > 0 && (!hide_root || c->parent != root) && c->is_visible_in_tree()) {
 				int root_ofs = children_pos.x + ((p_item->disable_folding || hide_folding) ? theme_cache.h_separation : theme_cache.item_margin);
 				int parent_ofs = p_pos.x + theme_cache.item_margin;
 				Point2i root_pos = Point2i(root_ofs, children_pos.y + child_self_height / 2) - theme_cache.offset + p_draw_ofs;
@@ -2670,7 +2694,6 @@ void Tree::select_single_item(TreeItem *p_selected, TreeItem *p_current, int p_c
 			if (p_selected == p_current && (!c.selected || allow_reselect)) {
 				c.selected = true;
 				selected_item = p_selected;
-				selected_col = 0;
 				if (!emitted_row) {
 					emit_signal(SNAME("item_selected"));
 					emitted_row = true;
@@ -2680,6 +2703,9 @@ void Tree::select_single_item(TreeItem *p_selected, TreeItem *p_current, int p_c
 					// Deselect other rows.
 					c.selected = false;
 				}
+			}
+			if (&selected_cell == &c) {
+				selected_col = i;
 			}
 		} else if (select_mode == SELECT_SINGLE || select_mode == SELECT_MULTI) {
 			if (!r_in_range && &selected_cell == &c) {
@@ -2788,7 +2814,7 @@ void Tree::_range_click_timeout() {
 }
 
 int Tree::propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, int x_limit, bool p_double_click, TreeItem *p_item, MouseButton p_button, const Ref<InputEventWithModifiers> &p_mod) {
-	if (p_item && !p_item->is_visible()) {
+	if (p_item && !p_item->is_visible_in_tree()) {
 		// Skip any processing of invisible items.
 		return 0;
 	}
@@ -3755,7 +3781,12 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 						Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_VISIBLE);
 						warp_mouse(range_drag_capture_pos);
 					} else {
-						Rect2 rect = get_selected()->get_meta("__focus_rect");
+						Rect2 rect;
+						if (select_mode == SELECT_ROW) {
+							rect = get_selected()->get_meta("__focus_col_" + itos(selected_col));
+						} else {
+							rect = get_selected()->get_meta("__focus_rect");
+						}
 						Point2 mpos = mb->get_position();
 						int icon_size_x = 0;
 						Ref<Texture2D> icon = get_selected()->get_icon(selected_col);
@@ -3845,6 +3876,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 				}
 
 				if (!root || (!root->get_first_child() && hide_root)) {
+					emit_signal(SNAME("empty_clicked"), get_local_mouse_position(), mb->get_button_index());
 					break;
 				}
 
@@ -3963,7 +3995,12 @@ bool Tree::edit_selected(bool p_force_edit) {
 		return false;
 	}
 
-	Rect2 rect = s->get_meta("__focus_rect");
+	Rect2 rect;
+	if (select_mode == SELECT_ROW) {
+		rect = s->get_meta("__focus_col_" + itos(selected_col));
+	} else {
+		rect = s->get_meta("__focus_rect");
+	}
 	popup_edited_item = s;
 	popup_edited_item_col = col;
 
@@ -4797,7 +4834,7 @@ int Tree::get_item_offset(TreeItem *p_item) const {
 			return ofs;
 		}
 
-		if ((it != root || !hide_root) && it->is_visible()) {
+		if ((it != root || !hide_root) && it->is_visible_in_tree()) {
 			ofs += compute_item_height(it);
 			ofs += theme_cache.v_separation;
 		}
@@ -5171,7 +5208,7 @@ void Tree::_do_incr_search(const String &p_add) {
 TreeItem *Tree::_find_item_at_pos(TreeItem *p_item, const Point2 &p_pos, int &r_column, int &h, int &section) const {
 	Point2 pos = p_pos;
 
-	if ((root != p_item || !hide_root) && p_item->is_visible()) {
+	if ((root != p_item || !hide_root) && p_item->is_visible_in_tree()) {
 		h = compute_item_height(p_item) + theme_cache.v_separation;
 		if (pos.y < h) {
 			if (drop_mode_flags == DROP_MODE_ON_ITEM) {
@@ -5204,7 +5241,7 @@ TreeItem *Tree::_find_item_at_pos(TreeItem *p_item, const Point2 &p_pos, int &r_
 		h = 0;
 	}
 
-	if (p_item->is_collapsed() || !p_item->is_visible()) {
+	if (p_item->is_collapsed() || !p_item->is_visible_in_tree()) {
 		return nullptr; // do not try children, it's collapsed
 	}
 
@@ -5569,8 +5606,8 @@ void Tree::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("item_selected"));
 	ADD_SIGNAL(MethodInfo("cell_selected"));
 	ADD_SIGNAL(MethodInfo("multi_selected", PropertyInfo(Variant::OBJECT, "item", PROPERTY_HINT_RESOURCE_TYPE, "TreeItem"), PropertyInfo(Variant::INT, "column"), PropertyInfo(Variant::BOOL, "selected")));
-	ADD_SIGNAL(MethodInfo("item_mouse_selected", PropertyInfo(Variant::VECTOR2, "position"), PropertyInfo(Variant::INT, "mouse_button_index")));
-	ADD_SIGNAL(MethodInfo("empty_clicked", PropertyInfo(Variant::VECTOR2, "position"), PropertyInfo(Variant::INT, "mouse_button_index")));
+	ADD_SIGNAL(MethodInfo("item_mouse_selected", PropertyInfo(Variant::VECTOR2, "mouse_position"), PropertyInfo(Variant::INT, "mouse_button_index")));
+	ADD_SIGNAL(MethodInfo("empty_clicked", PropertyInfo(Variant::VECTOR2, "click_position"), PropertyInfo(Variant::INT, "mouse_button_index")));
 	ADD_SIGNAL(MethodInfo("item_edited"));
 	ADD_SIGNAL(MethodInfo("custom_item_clicked", PropertyInfo(Variant::INT, "mouse_button_index")));
 	ADD_SIGNAL(MethodInfo("item_icon_double_clicked"));

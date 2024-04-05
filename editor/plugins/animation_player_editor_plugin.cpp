@@ -35,6 +35,7 @@
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
 #include "core/os/keyboard.h"
+#include "editor/editor_command_palette.h"
 #include "editor/editor_node.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -72,6 +73,8 @@ void AnimationPlayerEditor::_node_removed(Node *p_node) {
 		_update_player();
 
 		_ensure_dummy_player();
+
+		pin->set_pressed(false);
 	}
 }
 
@@ -2055,6 +2058,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	blend_editor.dialog->add_child(blend_vb);
 
 	blend_editor.tree = memnew(Tree);
+	blend_editor.tree->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	blend_editor.tree->set_hide_root(true);
 	blend_editor.tree->set_columns(2);
 	blend_editor.tree->set_column_expand_ratio(0, 10);
@@ -2275,7 +2279,7 @@ void AnimationPlayerEditorPlugin::make_visible(bool p_visible) {
 
 AnimationPlayerEditorPlugin::AnimationPlayerEditorPlugin() {
 	anim_editor = memnew(AnimationPlayerEditor(this));
-	EditorNode::get_bottom_panel()->add_item(TTR("Animation"), anim_editor);
+	EditorNode::get_bottom_panel()->add_item(TTR("Animation"), anim_editor, ED_SHORTCUT_AND_COMMAND("bottom_panels/toggle_animation_bottom_panel", TTR("Toggle Animation Bottom Panel"), KeyModifierMask::ALT | Key::N));
 }
 
 AnimationPlayerEditorPlugin::~AnimationPlayerEditorPlugin() {

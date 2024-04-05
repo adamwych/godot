@@ -57,7 +57,7 @@ bool EditorInspector::_property_path_matches(const String &p_property_path, cons
 
 	const Vector<String> prop_sections = p_property_path.split("/");
 	for (int i = 0; i < prop_sections.size(); i++) {
-		if (p_filter.is_subsequence_ofn(EditorPropertyNameProcessor::get_singleton()->process_name(prop_sections[i], p_style))) {
+		if (p_filter.is_subsequence_ofn(EditorPropertyNameProcessor::get_singleton()->process_name(prop_sections[i], p_style, p_property_path))) {
 			return true;
 		}
 	}
@@ -68,7 +68,7 @@ Size2 EditorProperty::get_minimum_size() const {
 	Size2 ms;
 	Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Tree"));
 	int font_size = get_theme_font_size(SNAME("font_size"), SNAME("Tree"));
-	ms.height = font->get_height(font_size) + 4 * EDSCALE;
+	ms.height = label.is_empty() ? 0 : font->get_height(font_size) + 4 * EDSCALE;
 
 	for (int i = 0; i < get_child_count(); i++) {
 		Control *c = Object::cast_to<Control>(get_child(i));
@@ -86,8 +86,7 @@ Size2 EditorProperty::get_minimum_size() const {
 		}
 
 		Size2 minsize = c->get_combined_minimum_size();
-		ms.width = MAX(ms.width, minsize.width);
-		ms.height = MAX(ms.height, minsize.height);
+		ms = ms.max(minsize);
 	}
 
 	if (keying) {
@@ -106,7 +105,7 @@ Size2 EditorProperty::get_minimum_size() const {
 	}
 
 	if (bottom_editor != nullptr && bottom_editor->is_visible()) {
-		ms.height += get_theme_constant(SNAME("v_separation"));
+		ms.height += label.is_empty() ? 0 : get_theme_constant(SNAME("v_separation"));
 		Size2 bems = bottom_editor->get_combined_minimum_size();
 		//bems.width += get_constant("item_margin", "Tree");
 		ms.height += bems.height;
@@ -138,7 +137,7 @@ void EditorProperty::_notification(int p_what) {
 				int child_room = size.width * (1.0 - split_ratio);
 				Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Tree"));
 				int font_size = get_theme_font_size(SNAME("font_size"), SNAME("Tree"));
-				int height = font->get_height(font_size) + 4 * EDSCALE;
+				int height = label.is_empty() ? 0 : font->get_height(font_size) + 4 * EDSCALE;
 				bool no_children = true;
 
 				//compute room needed
@@ -176,9 +175,8 @@ void EditorProperty::_notification(int p_what) {
 				}
 
 				if (bottom_editor) {
-					int m = 0; //get_constant("item_margin", "Tree");
-
-					bottom_rect = Rect2(m, rect.size.height + get_theme_constant(SNAME("v_separation")), size.width - m, bottom_editor->get_combined_minimum_size().height);
+					int v_offset = label.is_empty() ? 0 : get_theme_constant(SNAME("v_separation"));
+					bottom_rect = Rect2(0, rect.size.height + v_offset, size.width, bottom_editor->get_combined_minimum_size().height);
 				}
 
 				if (keying) {
@@ -254,8 +252,13 @@ void EditorProperty::_notification(int p_what) {
 				size.height = label_reference->get_size().height;
 			}
 
-			Ref<StyleBox> sb = get_theme_stylebox(selected ? SNAME("bg_selected") : SNAME("bg"));
-			draw_style_box(sb, Rect2(Vector2(), size));
+			// Only draw the label if it's not empty.
+			if (label.is_empty()) {
+				size.height = 0;
+			} else {
+				Ref<StyleBox> sb = get_theme_stylebox(selected ? SNAME("bg_selected") : SNAME("bg"));
+				draw_style_box(sb, Rect2(Vector2(), size));
+			}
 
 			Ref<StyleBox> bg_stylebox = get_theme_stylebox(SNAME("child_bg"));
 			if (draw_top_bg && right_child_rect != Rect2()) {
@@ -1459,8 +1462,7 @@ Size2 EditorInspectorSection::get_minimum_size() const {
 			continue;
 		}
 		Size2 minsize = c->get_combined_minimum_size();
-		ms.width = MAX(ms.width, minsize.width);
-		ms.height = MAX(ms.height, minsize.height);
+		ms = ms.max(minsize);
 	}
 
 	Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Tree"));
@@ -2005,6 +2007,10 @@ Array EditorInspectorArray::_extract_properties_as_array(const List<PropertyInfo
 	Array output;
 
 	for (const PropertyInfo &pi : p_list) {
+		if (!(pi.usage & PROPERTY_USAGE_EDITOR)) {
+			continue;
+		}
+
 		if (pi.name.begins_with(array_element_prefix)) {
 			String str = pi.name.trim_prefix(array_element_prefix);
 
@@ -2798,6 +2804,9 @@ void EditorInspector::update_tree() {
 			subgroup_base = "";
 			section_depth = 0;
 
+			vbox_per_path.clear();
+			editor_inspector_array_per_prefix.clear();
+
 			if (!show_categories) {
 				continue;
 			}
@@ -3003,7 +3012,7 @@ void EditorInspector::update_tree() {
 		if ((p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) && name_style == EditorPropertyNameProcessor::STYLE_LOCALIZED) {
 			name_style = EditorPropertyNameProcessor::STYLE_CAPITALIZED;
 		}
-		const String property_label_string = EditorPropertyNameProcessor::get_singleton()->process_name(name_override, name_style) + feature_tag;
+		const String property_label_string = EditorPropertyNameProcessor::get_singleton()->process_name(name_override, name_style, p.name, doc_name) + feature_tag;
 
 		// Remove the property from the path.
 		int idx = path.rfind("/");
@@ -3072,8 +3081,8 @@ void EditorInspector::update_tree() {
 						tooltip = EditorPropertyNameProcessor::get_singleton()->translate_group_name(component);
 					}
 				} else {
-					label = EditorPropertyNameProcessor::get_singleton()->process_name(component, section_name_style);
-					tooltip = EditorPropertyNameProcessor::get_singleton()->process_name(component, EditorPropertyNameProcessor::get_tooltip_style(section_name_style));
+					label = EditorPropertyNameProcessor::get_singleton()->process_name(component, section_name_style, p.name, doc_name);
+					tooltip = EditorPropertyNameProcessor::get_singleton()->process_name(component, EditorPropertyNameProcessor::get_tooltip_style(section_name_style), p.name, doc_name);
 				}
 
 				Color c = sscolor;
@@ -3136,7 +3145,7 @@ void EditorInspector::update_tree() {
 				editor_inspector_array = memnew(EditorInspectorArray(all_read_only));
 
 				String array_label = path.contains("/") ? path.substr(path.rfind("/") + 1) : path;
-				array_label = EditorPropertyNameProcessor::get_singleton()->process_name(property_label_string, property_name_style);
+				array_label = EditorPropertyNameProcessor::get_singleton()->process_name(property_label_string, property_name_style, p.name, doc_name);
 				int page = per_array_page.has(array_element_prefix) ? per_array_page[array_element_prefix] : 0;
 				editor_inspector_array->setup_with_move_element_function(object, array_label, array_element_prefix, page, c, use_folding);
 				editor_inspector_array->connect("page_change_request", callable_mp(this, &EditorInspector::_page_change_request).bind(array_element_prefix));

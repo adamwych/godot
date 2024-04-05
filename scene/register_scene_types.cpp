@@ -52,6 +52,7 @@
 #include "scene/2d/navigation_link_2d.h"
 #include "scene/2d/navigation_obstacle_2d.h"
 #include "scene/2d/navigation_region_2d.h"
+#include "scene/2d/parallax_2d.h"
 #include "scene/2d/parallax_background.h"
 #include "scene/2d/parallax_layer.h"
 #include "scene/2d/path_2d.h"
@@ -76,6 +77,7 @@
 #include "scene/2d/skeleton_2d.h"
 #include "scene/2d/sprite_2d.h"
 #include "scene/2d/tile_map.h"
+#include "scene/2d/tile_map_layer.h"
 #include "scene/2d/touch_screen_button.h"
 #include "scene/2d/visible_on_screen_notifier_2d.h"
 #include "scene/animation/animation_blend_space_1d.h"
@@ -102,6 +104,7 @@
 #include "scene/gui/file_dialog.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/graph_edit.h"
+#include "scene/gui/graph_frame.h"
 #include "scene/gui/graph_node.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/item_list.h"
@@ -250,6 +253,7 @@
 #include "scene/3d/node_3d.h"
 #include "scene/3d/occluder_instance_3d.h"
 #include "scene/3d/path_3d.h"
+#include "scene/3d/physical_bone_simulator_3d.h"
 #include "scene/3d/physics/animatable_body_3d.h"
 #include "scene/3d/physics/area_3d.h"
 #include "scene/3d/physics/character_body_3d.h"
@@ -274,6 +278,7 @@
 #include "scene/3d/remote_transform_3d.h"
 #include "scene/3d/skeleton_3d.h"
 #include "scene/3d/skeleton_ik_3d.h"
+#include "scene/3d/skeleton_modifier_3d.h"
 #include "scene/3d/soft_body_3d.h"
 #include "scene/3d/sprite_3d.h"
 #include "scene/3d/visible_on_screen_notifier_3d.h"
@@ -471,6 +476,7 @@ void register_scene_types() {
 
 	GDREGISTER_CLASS(GraphElement);
 	GDREGISTER_CLASS(GraphNode);
+	GDREGISTER_CLASS(GraphFrame);
 	GDREGISTER_CLASS(GraphEdit);
 
 	OS::get_singleton()->yield(); // may take time to init
@@ -582,6 +588,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(CPUParticles3D);
 	GDREGISTER_CLASS(Marker3D);
 	GDREGISTER_CLASS(RootMotionView);
+	GDREGISTER_ABSTRACT_CLASS(SkeletonModifier3D);
 
 	OS::get_singleton()->yield(); // may take time to init
 
@@ -594,6 +601,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(CharacterBody3D);
 	GDREGISTER_CLASS(SpringArm3D);
 
+	GDREGISTER_CLASS(PhysicalBoneSimulator3D);
 	GDREGISTER_CLASS(PhysicalBone3D);
 	GDREGISTER_CLASS(SoftBody3D);
 
@@ -647,7 +655,7 @@ void register_scene_types() {
 	GDREGISTER_ABSTRACT_CLASS(VisualShaderNodeGroupBase);
 	GDREGISTER_ABSTRACT_CLASS(VisualShaderNodeConstant);
 	GDREGISTER_ABSTRACT_CLASS(VisualShaderNodeVectorBase);
-	GDREGISTER_CLASS(VisualShaderNodeComment);
+	GDREGISTER_CLASS(VisualShaderNodeFrame);
 	GDREGISTER_CLASS(VisualShaderNodeFloatConstant);
 	GDREGISTER_CLASS(VisualShaderNodeIntConstant);
 	GDREGISTER_CLASS(VisualShaderNodeUIntConstant);
@@ -812,7 +820,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(TileMapPattern);
 	GDREGISTER_CLASS(TileData);
 	GDREGISTER_CLASS(TileMap);
-	GDREGISTER_ABSTRACT_CLASS(TileMapLayerGroup);
+	GDREGISTER_CLASS(TileMapLayer);
+	GDREGISTER_CLASS(Parallax2D);
 	GDREGISTER_CLASS(ParallaxBackground);
 	GDREGISTER_CLASS(ParallaxLayer);
 	GDREGISTER_CLASS(TouchScreenButton);

@@ -38,9 +38,6 @@ void XRBodyModifier3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_body_tracker", "tracker_name"), &XRBodyModifier3D::set_body_tracker);
 	ClassDB::bind_method(D_METHOD("get_body_tracker"), &XRBodyModifier3D::get_body_tracker);
 
-	ClassDB::bind_method(D_METHOD("set_target", "target"), &XRBodyModifier3D::set_target);
-	ClassDB::bind_method(D_METHOD("get_target"), &XRBodyModifier3D::get_target);
-
 	ClassDB::bind_method(D_METHOD("set_body_update", "body_update"), &XRBodyModifier3D::set_body_update);
 	ClassDB::bind_method(D_METHOD("get_body_update"), &XRBodyModifier3D::get_body_update);
 
@@ -51,7 +48,6 @@ void XRBodyModifier3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_show_when_tracked"), &XRBodyModifier3D::get_show_when_tracked);
 
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "body_tracker", PROPERTY_HINT_ENUM_SUGGESTION, "/user/body"), "set_body_tracker", "get_body_tracker");
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Skeleton3D"), "set_target", "get_target");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "body_update", PROPERTY_HINT_FLAGS, "Upper Body,Lower Body,Hands"), "set_body_update", "get_body_update");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bone_update", PROPERTY_HINT_ENUM, "Full,Rotation Only"), "set_bone_update", "get_bone_update");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_when_tracked"), "set_show_when_tracked", "get_show_when_tracked");
@@ -71,18 +67,6 @@ void XRBodyModifier3D::set_body_tracker(const StringName &p_tracker_name) {
 
 StringName XRBodyModifier3D::get_body_tracker() const {
 	return tracker_name;
-}
-
-void XRBodyModifier3D::set_target(const NodePath &p_target) {
-	target = p_target;
-
-	if (is_inside_tree()) {
-		_get_joint_data();
-	}
-}
-
-NodePath XRBodyModifier3D::get_target() const {
-	return target;
 }
 
 void XRBodyModifier3D::set_body_update(BitField<BodyUpdate> p_body_update) {
@@ -108,20 +92,6 @@ void XRBodyModifier3D::set_show_when_tracked(bool p_show_when_tracked) {
 
 bool XRBodyModifier3D::get_show_when_tracked() const {
 	return show_when_tracked;
-}
-
-Skeleton3D *XRBodyModifier3D::get_skeleton() {
-	if (!has_node(target)) {
-		return nullptr;
-	}
-
-	Node *node = get_node(target);
-	if (!node) {
-		return nullptr;
-	}
-
-	Skeleton3D *skeleton = Object::cast_to<Skeleton3D>(node);
-	return skeleton;
 }
 
 void XRBodyModifier3D::_get_joint_data() {
@@ -252,11 +222,6 @@ void XRBodyModifier3D::_get_joint_data() {
 		}
 	}
 
-	// If the root bone is not found then use the skeleton root bone.
-	if (bones[XRBodyTracker::JOINT_ROOT] == -1) {
-		bones[XRBodyTracker::JOINT_ROOT] = 0;
-	}
-
 	// Assemble the joint relationship to the available skeleton bones.
 	for (int i = 0; i < XRBodyTracker::JOINT_MAX; i++) {
 		// Get the skeleton bone (skip if not found).
@@ -286,7 +251,7 @@ void XRBodyModifier3D::_get_joint_data() {
 	}
 }
 
-void XRBodyModifier3D::_update_skeleton() {
+void XRBodyModifier3D::_process_modification() {
 	Skeleton3D *skeleton = get_skeleton();
 	if (!skeleton) {
 		return;
@@ -311,18 +276,22 @@ void XRBodyModifier3D::_update_skeleton() {
 		return;
 	}
 
-	// Read the relevant tracking data.
+	// Get the world and skeleton scale.
+	const float ws = xr_server->get_world_scale();
+	const float ss = skeleton->get_motion_scale();
+
+	// Read the relevant tracking data. This applies the skeleton motion scale to
+	// the joint transforms, allowing the tracking data to be scaled to the skeleton.
 	bool has_valid_data[XRBodyTracker::JOINT_MAX];
 	Transform3D transforms[XRBodyTracker::JOINT_MAX];
 	Transform3D inv_transforms[XRBodyTracker::JOINT_MAX];
-	const float ws = xr_server->get_world_scale();
 	for (int joint = 0; joint < XRBodyTracker::JOINT_MAX; joint++) {
 		BitField<XRBodyTracker::JointFlags> flags = tracker->get_joint_flags(static_cast<XRBodyTracker::Joint>(joint));
 		has_valid_data[joint] = flags.has_flag(XRBodyTracker::JOINT_FLAG_ORIENTATION_VALID) && flags.has_flag(XRBodyTracker::JOINT_FLAG_POSITION_VALID);
 
 		if (has_valid_data[joint]) {
 			transforms[joint] = tracker->get_joint_transform(static_cast<XRBodyTracker::Joint>(joint));
-			transforms[joint].origin *= ws;
+			transforms[joint].origin *= ss;
 			inv_transforms[joint] = transforms[joint].inverse();
 		}
 	}
@@ -353,8 +322,9 @@ void XRBodyModifier3D::_update_skeleton() {
 		const int parent_joint = joints[joint].parent_joint;
 		const Transform3D relative_transform = inv_transforms[parent_joint] * transforms[joint];
 
-		// Update the bone position if enabled by update mode.
-		if (bone_update == BONE_UPDATE_FULL) {
+		// Update the bone position if enabled by update mode, or if the joint is the hips, to allow
+		// for climbing or crouching.
+		if (bone_update == BONE_UPDATE_FULL || joint == XRBodyTracker::JOINT_HIPS) {
 			skeleton->set_bone_pose_position(joints[joint].bone, relative_transform.origin);
 		}
 
@@ -362,8 +332,10 @@ void XRBodyModifier3D::_update_skeleton() {
 		skeleton->set_bone_pose_rotation(joints[joint].bone, Quaternion(relative_transform.basis));
 	}
 
-	// Transform to the skeleton pose.
-	set_transform(transforms[XRBodyTracker::JOINT_ROOT]);
+	// Transform to the tracking data root pose. This also applies the XR world-scale to allow
+	// scaling the avatars mesh and skeleton appropriately (if they are child nodes).
+	set_transform(
+			transforms[XRBodyTracker::JOINT_ROOT] * ws);
 
 	// If tracking-state determines visibility then show the node.
 	if (show_when_tracked) {
@@ -377,6 +349,10 @@ void XRBodyModifier3D::_tracker_changed(const StringName &p_tracker_name, const 
 	}
 }
 
+void XRBodyModifier3D::_skeleton_changed(Skeleton3D *p_old, Skeleton3D *p_new) {
+	_get_joint_data();
+}
+
 void XRBodyModifier3D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
@@ -386,10 +362,7 @@ void XRBodyModifier3D::_notification(int p_what) {
 				xr_server->connect("body_tracker_updated", callable_mp(this, &XRBodyModifier3D::_tracker_changed));
 				xr_server->connect("body_tracker_removed", callable_mp(this, &XRBodyModifier3D::_tracker_changed).bind(Ref<XRBodyTracker>()));
 			}
-
 			_get_joint_data();
-
-			set_process_internal(true);
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
 			XRServer *xr_server = XRServer::get_singleton();
@@ -398,16 +371,10 @@ void XRBodyModifier3D::_notification(int p_what) {
 				xr_server->disconnect("body_tracker_updated", callable_mp(this, &XRBodyModifier3D::_tracker_changed));
 				xr_server->disconnect("body_tracker_removed", callable_mp(this, &XRBodyModifier3D::_tracker_changed).bind(Ref<XRBodyTracker>()));
 			}
-
-			set_process_internal(false);
-
 			for (int i = 0; i < XRBodyTracker::JOINT_MAX; i++) {
 				joints[i].bone = -1;
 				joints[i].parent_joint = -1;
 			}
-		} break;
-		case NOTIFICATION_INTERNAL_PROCESS: {
-			_update_skeleton();
 		} break;
 		default: {
 		} break;
