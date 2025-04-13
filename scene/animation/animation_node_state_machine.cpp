@@ -260,10 +260,10 @@ void AnimationNodeStateMachinePlayback::travel(const StringName &p_state, bool p
 	_travel_main(p_state, p_reset_on_teleport);
 }
 
-void AnimationNodeStateMachinePlayback::start(const StringName &p_state, bool p_reset) {
+void AnimationNodeStateMachinePlayback::start(const StringName &p_state, bool p_reset, double p_seek) {
 	ERR_FAIL_COND_EDMSG(is_grouped, "Grouped AnimationNodeStateMachinePlayback must be handled by parent AnimationNodeStateMachinePlayback. You need to retrieve the parent Root/Nested AnimationNodeStateMachine.");
 	ERR_FAIL_COND_EDMSG(String(p_state).contains("/Start") || String(p_state).contains("/End"), "Grouped AnimationNodeStateMachinePlayback doesn't allow to play Start/End directly. Instead, play the prev or next state of group in the parent AnimationNodeStateMachine.");
-	_start_main(p_state, p_reset);
+	_start_main(p_state, p_reset, p_seek);
 }
 
 void AnimationNodeStateMachinePlayback::next() {
@@ -282,12 +282,13 @@ void AnimationNodeStateMachinePlayback::_travel_main(const StringName &p_state, 
 	stop_request = false;
 }
 
-void AnimationNodeStateMachinePlayback::_start_main(const StringName &p_state, bool p_reset) {
+void AnimationNodeStateMachinePlayback::_start_main(const StringName &p_state, bool p_reset, double p_seek) {
 	travel_request = StringName();
 	path.clear();
 	reset_request = p_reset;
 	start_request = p_state;
 	stop_request = false;
+	seek_request = p_seek;
 }
 
 void AnimationNodeStateMachinePlayback::_next_main() {
@@ -848,6 +849,11 @@ AnimationNode::NodeTimeInfo AnimationNodeStateMachinePlayback::_process(const St
 		pi.time = 0;
 		pi.seeked = true;
 	}
+	if (seek_request != 0.0) {
+		pi.time = seek_request;
+		pi.seeked = true;
+		seek_request = 0.0;
+	}
 	current_nti = p_state_machine->blend_node(p_state_machine->states[current].node, current, pi, AnimationNode::FILTER_IGNORE, true, p_test_only); // Blend values must be more than CMP_EPSILON to process discrete keys in edge.
 
 	// Cross-fade process.
@@ -1185,7 +1191,7 @@ Ref<AnimationNodeStateMachineTransition> AnimationNodeStateMachinePlayback::_get
 
 void AnimationNodeStateMachinePlayback::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("travel", "to_node", "reset_on_teleport"), &AnimationNodeStateMachinePlayback::travel, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("start", "node", "reset"), &AnimationNodeStateMachinePlayback::start, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("start", "node", "reset", "seek"), &AnimationNodeStateMachinePlayback::start, DEFVAL(true), DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("next"), &AnimationNodeStateMachinePlayback::next);
 	ClassDB::bind_method(D_METHOD("stop"), &AnimationNodeStateMachinePlayback::stop);
 	ClassDB::bind_method(D_METHOD("is_playing"), &AnimationNodeStateMachinePlayback::is_playing);

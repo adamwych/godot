@@ -284,11 +284,12 @@ class AnimationNodeStateMachinePlayback : public Resource {
 	bool next_request = false;
 	bool stop_request = false;
 	bool teleport_request = false;
+	double seek_request = 0.0;
 
 	bool is_grouped = false;
 
 	void _travel_main(const StringName &p_state, bool p_reset_on_teleport = true);
-	void _start_main(const StringName &p_state, bool p_reset = true);
+	void _start_main(const StringName &p_state, bool p_reset = true, double p_seek = 0.0);
 	void _next_main();
 	void _stop_main();
 
@@ -325,7 +326,7 @@ protected:
 
 public:
 	void travel(const StringName &p_state, bool p_reset_on_teleport = true);
-	void start(const StringName &p_state, bool p_reset = true);
+	void start(const StringName &p_state, bool p_reset = true, double p_seek = 0.0);
 	void next();
 	void stop();
 	bool is_playing() const;
