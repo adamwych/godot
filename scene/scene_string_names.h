@@ -99,6 +99,8 @@ public:
 	const StringName body_shape_exited = StaticCString::create("body_shape_exited");
 	const StringName body_exited = StaticCString::create("body_exited");
 
+	const StringName current_node_changed = StaticCString::create("current_node_changed");
+
 	const StringName area_shape_entered = StaticCString::create("area_shape_entered");
 	const StringName area_shape_exited = StaticCString::create("area_shape_exited");
 

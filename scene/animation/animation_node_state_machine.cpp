@@ -194,7 +194,7 @@ AnimationNodeStateMachineTransition::AnimationNodeStateMachineTransition() {
 
 void AnimationNodeStateMachinePlayback::_set_current(AnimationNodeStateMachine *p_state_machine, const StringName &p_state) {
 	if (p_state != current) {
-		emit_signal(SNAME("current_node_changed"));
+		emit_signal(SceneStringName(current_node_changed));
 	}
 
 	current = p_state;
