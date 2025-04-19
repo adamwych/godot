@@ -196,7 +196,7 @@ void AnimationNodeStateMachinePlayback::_set_current(AnimationNodeStateMachine *
 	if (p_state != current) {
 		emit_signal(SceneStringName(current_node_changed));
 	}
-
+	
 	current = p_state;
 	if (current == StringName()) {
 		group_start_transition = Ref<AnimationNodeStateMachineTransition>();
@@ -1439,8 +1439,9 @@ void AnimationNodeStateMachine::_rename_transitions(const StringName &p_name, co
 	updating_transitions = false;
 }
 
-Vector<StringName> AnimationNodeStateMachine::get_node_list() const {
-	Vector<StringName> nodes;
+LocalVector<StringName> AnimationNodeStateMachine::get_node_list() const {
+	LocalVector<StringName> nodes;
+	nodes.resize(states.size());
 	for (const KeyValue<StringName, State> &E : states) {
 		nodes.push_back(E.key);
 	}
@@ -1450,7 +1451,7 @@ Vector<StringName> AnimationNodeStateMachine::get_node_list() const {
 
 TypedArray<StringName> AnimationNodeStateMachine::_get_node_list() const {
 	TypedArray<StringName> typed_arr;
-	Vector<StringName> vec = get_node_list();
+	LocalVector<StringName> vec = get_node_list();
 	typed_arr.resize(vec.size());
 	for (int i = 0; i < vec.size(); i++) {
 		typed_arr[i] = vec[i];

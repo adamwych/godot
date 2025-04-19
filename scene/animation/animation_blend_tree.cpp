@@ -1667,17 +1667,19 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendTree::_process(const AnimationMixe
 	return _blend_node(output, "output", this, pi, FILTER_IGNORE, true, p_test_only, nullptr);
 }
 
-Vector<StringName> AnimationNodeBlendTree::get_node_list() const {
-	Vector<StringName> list;
+LocalVector<StringName> AnimationNodeBlendTree::get_node_list() const {
+	LocalVector<StringName> list;
+	list.resize(nodes.size());
 	for (const KeyValue<StringName, Node> &E : nodes) {
 		list.push_back(E.key);
 	}
+	list.sort_custom<StringName::AlphCompare>();
 	return list;
 }
 
 TypedArray<StringName> AnimationNodeBlendTree::_get_node_list() const {
 	TypedArray<StringName> typed_arr;
-	Vector<StringName> vec = get_node_list();
+	LocalVector<StringName> vec = get_node_list();
 	typed_arr.resize(vec.size());
 	for (int i = 0; i < vec.size(); i++) {
 		typed_arr[i] = vec[i];

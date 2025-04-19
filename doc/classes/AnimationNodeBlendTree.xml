@@ -44,6 +44,12 @@
 				Returns the sub animation node with the specified [param name].
 			</description>
 		</method>
+		<method name="get_node_list" qualifiers="const">
+			<return type="StringName[]" />
+			<description>
+				Returns a list containing names of all nodes.
+			</description>
+		</method>
 		<method name="get_node_position" qualifiers="const">
 			<return type="Vector2" />
 			<param index="0" name="name" type="StringName" />
