@@ -417,8 +417,6 @@ class AnimationNodeBlendTree : public AnimationRootNode {
 
 	void _initialize_node_tree();
 
-	TypedArray<StringName> _get_node_list() const;
-
 protected:
 	static void _bind_methods();
 	bool _set(const StringName &p_name, const Variant &p_value);
