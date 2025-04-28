@@ -1669,7 +1669,7 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendTree::_process(const AnimationMixe
 
 LocalVector<StringName> AnimationNodeBlendTree::get_node_list() const {
 	LocalVector<StringName> list;
-	list.resize(nodes.size());
+	list.reserve(nodes.size());
 	for (const KeyValue<StringName, Node> &E : nodes) {
 		list.push_back(E.key);
 	}
@@ -1677,11 +1677,11 @@ LocalVector<StringName> AnimationNodeBlendTree::get_node_list() const {
 	return list;
 }
 
-TypedArray<StringName> AnimationNodeBlendTree::_get_node_list() const {
+TypedArray<StringName> AnimationNodeBlendTree::get_node_list_as_typed_array() const {
 	TypedArray<StringName> typed_arr;
 	LocalVector<StringName> vec = get_node_list();
 	typed_arr.resize(vec.size());
-	for (int i = 0; i < vec.size(); i++) {
+	for (uint32_t i = 0; i < vec.size(); i++) {
 		typed_arr[i] = vec[i];
 	}
 	return typed_arr;
@@ -1841,7 +1841,7 @@ void AnimationNodeBlendTree::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_node", "name"), &AnimationNodeBlendTree::has_node);
 	ClassDB::bind_method(D_METHOD("connect_node", "input_node", "input_index", "output_node"), &AnimationNodeBlendTree::connect_node);
 	ClassDB::bind_method(D_METHOD("disconnect_node", "input_node", "input_index"), &AnimationNodeBlendTree::disconnect_node);
-	ClassDB::bind_method(D_METHOD("get_node_list"), &AnimationNodeBlendTree::_get_node_list);
+	ClassDB::bind_method(D_METHOD("get_node_list"), &AnimationNodeBlendTree::get_node_list_as_typed_array);
 
 	ClassDB::bind_method(D_METHOD("set_node_position", "name", "position"), &AnimationNodeBlendTree::set_node_position);
 	ClassDB::bind_method(D_METHOD("get_node_position", "name"), &AnimationNodeBlendTree::get_node_position);

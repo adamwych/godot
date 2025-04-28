@@ -330,67 +330,6 @@ void ScriptEditorBase::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("go_to_method", PropertyInfo(Variant::OBJECT, "script"), PropertyInfo(Variant::STRING, "method")));
 }
 
-class EditorScriptCodeCompletionCache : public ScriptCodeCompletionCache {
-	struct Cache {
-		uint64_t time_loaded = 0;
-		Ref<Resource> cache;
-	};
-
-	HashMap<String, Cache> cached;
-
-public:
-	uint64_t max_time_cache = 5 * 60 * 1000; //minutes, five
-	uint32_t max_cache_size = 128;
-
-	void cleanup() {
-		List<String> to_clean;
-
-		HashMap<String, Cache>::Iterator I = cached.begin();
-		while (I) {
-			if ((OS::get_singleton()->get_ticks_msec() - I->value.time_loaded) > max_time_cache) {
-				to_clean.push_back(I->key);
-			}
-			++I;
-		}
-
-		while (to_clean.front()) {
-			cached.erase(to_clean.front()->get());
-			to_clean.pop_front();
-		}
-	}
-
-	virtual Ref<Resource> get_cached_resource(const String &p_path) {
-		HashMap<String, Cache>::Iterator E = cached.find(p_path);
-		if (!E) {
-			Cache c;
-			c.cache = ResourceLoader::load(p_path);
-			E = cached.insert(p_path, c);
-		}
-
-		E->value.time_loaded = OS::get_singleton()->get_ticks_msec();
-
-		if (cached.size() > max_cache_size) {
-			uint64_t older;
-			HashMap<String, Cache>::Iterator O = cached.begin();
-			older = O->value.time_loaded;
-			HashMap<String, Cache>::Iterator I = O;
-			while (I) {
-				if (I->value.time_loaded < older) {
-					older = I->value.time_loaded;
-					O = I;
-				}
-				++I;
-			}
-
-			if (O != E) { //should never happen..
-				cached.remove(O);
-			}
-		}
-
-		return E->value.cache;
-	}
-};
-
 void ScriptEditorQuickOpen::popup_dialog(const Vector<String> &p_functions, bool p_dontclear) {
 	popup_centered_ratio(0.6);
 	if (p_dontclear) {
@@ -630,8 +569,7 @@ void ScriptEditor::_clear_breakpoints() {
 	}
 
 	// Clear from closed scripts.
-	List<String> cached_editors;
-	script_editor_cache->get_sections(&cached_editors);
+	Vector<String> cached_editors = script_editor_cache->get_sections();
 	for (const String &E : cached_editors) {
 		Array breakpoints = _get_cached_breakpoints_for_script(E);
 		for (int breakpoint : breakpoints) {
@@ -1014,6 +952,15 @@ void ScriptEditor::_close_other_tabs() {
 			script_close_queue.push_back(i);
 		}
 	}
+	_queue_close_tabs();
+}
+
+void ScriptEditor::_close_tabs_below() {
+	int current_idx = tab_container->get_current_tab();
+	for (int i = tab_container->get_tab_count() - 1; i > current_idx; i--) {
+		script_close_queue.push_back(i);
+	}
+	_go_to_tab(current_idx);
 	_queue_close_tabs();
 }
 
@@ -1595,6 +1542,9 @@ void ScriptEditor::_menu_option(int p_option) {
 			case CLOSE_OTHER_TABS: {
 				_close_other_tabs();
 			} break;
+			case CLOSE_TABS_BELOW: {
+				_close_tabs_below();
+			} break;
 			case CLOSE_ALL: {
 				_close_all_tabs();
 			} break;
@@ -1640,6 +1590,9 @@ void ScriptEditor::_menu_option(int p_option) {
 				} break;
 				case CLOSE_OTHER_TABS: {
 					_close_other_tabs();
+				} break;
+				case CLOSE_TABS_BELOW: {
+					_close_tabs_below();
 				} break;
 				case CLOSE_ALL: {
 					_close_all_tabs();
@@ -1784,7 +1737,10 @@ void ScriptEditor::_notification(int p_what) {
 			[[fallthrough]];
 		}
 
-		case NOTIFICATION_TRANSLATION_CHANGED:
+		case NOTIFICATION_TRANSLATION_CHANGED: {
+			disk_changed_list->set_accessibility_name(TTR("The following files are newer on disk"));
+			[[fallthrough]];
+		}
 		case NOTIFICATION_LAYOUT_DIRECTION_CHANGED:
 		case NOTIFICATION_THEME_CHANGED: {
 			tab_container->add_theme_style_override(SceneStringName(panel), get_theme_stylebox(SNAME("ScriptEditor"), EditorStringName(EditorStyles)));
@@ -1915,8 +1871,7 @@ Vector<String> ScriptEditor::_get_breakpoints() {
 	}
 
 	// Load breakpoints that are in closed scripts.
-	List<String> cached_editors;
-	script_editor_cache->get_sections(&cached_editors);
+	Vector<String> cached_editors = script_editor_cache->get_sections();
 	for (const String &E : cached_editors) {
 		if (loaded_scripts.has(E)) {
 			continue;
@@ -1956,8 +1911,7 @@ void ScriptEditor::get_breakpoints(List<String> *p_breakpoints) {
 	}
 
 	// Load breakpoints that are in closed scripts.
-	List<String> cached_editors;
-	script_editor_cache->get_sections(&cached_editors);
+	Vector<String> cached_editors = script_editor_cache->get_sections();
 	for (const String &E : cached_editors) {
 		if (loaded_scripts.has(E)) {
 			continue;
@@ -2062,7 +2016,7 @@ void ScriptEditor::_update_members_overview_visibility() {
 	if (!se) {
 		members_overview_alphabeta_sort_button->set_visible(false);
 		members_overview->set_visible(false);
-		overview_vbox->set_visible(false);
+		overview_vbox->set_visible(help_overview_enabled);
 		return;
 	}
 
@@ -3454,8 +3408,9 @@ void ScriptEditor::_make_script_list_context_menu() {
 		context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/save_as"), FILE_SAVE_AS);
 	}
 	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_file"), FILE_CLOSE);
-	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_all"), CLOSE_ALL);
 	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_other_tabs"), CLOSE_OTHER_TABS);
+	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_tabs_below"), CLOSE_TABS_BELOW);
+	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_all"), CLOSE_ALL);
 	context_menu->add_shortcut(ED_GET_SHORTCUT("script_editor/close_docs"), CLOSE_DOCS);
 	context_menu->add_separator();
 	if (se) {
@@ -3481,6 +3436,7 @@ void ScriptEditor::_make_script_list_context_menu() {
 	context_menu->set_item_disabled(context_menu->get_item_index(CLOSE_ALL), tab_container->get_tab_count() <= 0);
 	context_menu->set_item_disabled(context_menu->get_item_index(CLOSE_OTHER_TABS), tab_container->get_tab_count() <= 1);
 	context_menu->set_item_disabled(context_menu->get_item_index(CLOSE_DOCS), !_has_docs_tab());
+	context_menu->set_item_disabled(context_menu->get_item_index(CLOSE_TABS_BELOW), tab_container->get_current_tab() >= tab_container->get_tab_count() - 1);
 	context_menu->set_item_disabled(context_menu->get_item_index(WINDOW_MOVE_UP), tab_container->get_current_tab() <= 0);
 	context_menu->set_item_disabled(context_menu->get_item_index(WINDOW_MOVE_DOWN), tab_container->get_current_tab() >= tab_container->get_tab_count() - 1);
 	context_menu->set_item_disabled(context_menu->get_item_index(WINDOW_SORT), tab_container->get_tab_count() <= 1);
@@ -3588,8 +3544,7 @@ void ScriptEditor::set_window_layout(Ref<ConfigFile> p_layout) {
 
 	// Remove any deleted editors that have been removed between launches.
 	// and if a Script, register breakpoints with the debugger.
-	List<String> cached_editors;
-	script_editor_cache->get_sections(&cached_editors);
+	Vector<String> cached_editors = script_editor_cache->get_sections();
 	for (const String &E : cached_editors) {
 		if (loaded_scripts.has(E)) {
 			continue;
@@ -4167,7 +4122,6 @@ ScriptEditor::ScriptEditor(WindowWrapper *p_wrapper) {
 	script_editor_cache.instantiate();
 	script_editor_cache->load(EditorPaths::get_singleton()->get_project_settings_dir().path_join("script_editor_cache.cfg"));
 
-	completion_cache = memnew(EditorScriptCodeCompletionCache);
 	restoring_layout = false;
 	waiting_update_names = false;
 	pending_auto_reload = false;
@@ -4227,6 +4181,7 @@ ScriptEditor::ScriptEditor(WindowWrapper *p_wrapper) {
 	overview_vbox->add_child(buttons_hbox);
 
 	filename = memnew(Label);
+	filename->set_focus_mode(FOCUS_ACCESSIBILITY);
 	filename->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	filename->set_clip_text(true);
 	filename->set_h_size_flags(SIZE_EXPAND_FILL);
@@ -4349,6 +4304,7 @@ ScriptEditor::ScriptEditor(WindowWrapper *p_wrapper) {
 	file_menu->get_popup()->add_shortcut(ED_SHORTCUT("script_editor/close_file", TTRC("Close"), KeyModifierMask::CMD_OR_CTRL | Key::W), FILE_CLOSE);
 	file_menu->get_popup()->add_shortcut(ED_SHORTCUT("script_editor/close_all", TTRC("Close All")), CLOSE_ALL);
 	file_menu->get_popup()->add_shortcut(ED_SHORTCUT("script_editor/close_other_tabs", TTRC("Close Other Tabs")), CLOSE_OTHER_TABS);
+	file_menu->get_popup()->add_shortcut(ED_SHORTCUT("script_editor/close_tabs_below", TTRC("Close Tabs Below")), CLOSE_TABS_BELOW);
 	file_menu->get_popup()->add_shortcut(ED_SHORTCUT("script_editor/close_docs", TTRC("Close Docs")), CLOSE_DOCS);
 
 	file_menu->get_popup()->add_separator();
@@ -4385,6 +4341,7 @@ ScriptEditor::ScriptEditor(WindowWrapper *p_wrapper) {
 	script_icon = memnew(TextureRect);
 	menu_hb->add_child(script_icon);
 	script_name_label = memnew(Label);
+	script_name_label->set_focus_mode(FOCUS_ACCESSIBILITY);
 	menu_hb->add_child(script_name_label);
 
 	script_icon->hide();
@@ -4533,10 +4490,6 @@ ScriptEditor::ScriptEditor(WindowWrapper *p_wrapper) {
 	register_syntax_highlighter(markdown_syntax_highlighter);
 
 	_update_online_doc();
-}
-
-ScriptEditor::~ScriptEditor() {
-	memdelete(completion_cache);
 }
 
 void ScriptEditorPlugin::_focus_another_editor() {

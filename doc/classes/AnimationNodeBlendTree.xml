@@ -47,7 +47,7 @@
 		<method name="get_node_list" qualifiers="const">
 			<return type="StringName[]" />
 			<description>
-				Returns a list containing names of all nodes.
+				Returns a list containing the names of all sub animation nodes in this blend tree.
 			</description>
 		</method>
 		<method name="get_node_position" qualifiers="const">

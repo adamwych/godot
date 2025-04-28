@@ -177,6 +177,7 @@ public:
 	bool has_node(const StringName &p_name) const;
 	StringName get_node_name(const Ref<AnimationNode> &p_node) const;
 	LocalVector<StringName> get_node_list() const;
+	TypedArray<StringName> get_node_list_as_typed_array() const;
 
 	void set_node_position(const StringName &p_name, const Vector2 &p_position);
 	Vector2 get_node_position(const StringName &p_name) const;

@@ -128,6 +128,7 @@
 #include "editor/import/resource_importer_imagefont.h"
 #include "editor/import/resource_importer_layered_texture.h"
 #include "editor/import/resource_importer_shader_file.h"
+#include "editor/import/resource_importer_svg.h"
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
@@ -941,6 +942,11 @@ void EditorNode::_notification(int p_what) {
 				EditorHelpHighlighter::get_singleton()->reset_cache();
 			}
 #endif
+#ifdef ANDROID_ENABLED
+			if (EditorSettings::get_singleton()->check_changed_settings_in_group("interface/touchscreen/touch_actions_panel")) {
+				_touch_actions_panel_mode_changed();
+			}
+#endif
 		} break;
 	}
 }
@@ -1643,8 +1649,7 @@ void EditorNode::_load_editor_plugin_states_from_config(const Ref<ConfigFile> &p
 		return;
 	}
 
-	List<String> esl;
-	p_config_file->get_section_keys("editor_states", &esl);
+	Vector<String> esl = p_config_file->get_section_keys("editor_states");
 
 	Dictionary md;
 	for (const String &E : esl) {
@@ -2373,8 +2378,7 @@ void EditorNode::_dialog_action(String p_file) {
 			}
 
 			// Erase key values.
-			List<String> keys;
-			config->get_section_keys(p_file, &keys);
+			Vector<String> keys = config->get_section_keys(p_file);
 			for (const String &key : keys) {
 				config->set_value(p_file, key, Variant());
 			}
@@ -5772,8 +5776,7 @@ void EditorNode::_update_layouts_menu() {
 		return; // No config.
 	}
 
-	List<String> layouts;
-	config.ptr()->get_sections(&layouts);
+	Vector<String> layouts = config->get_sections();
 
 	for (const String &layout : layouts) {
 		if (layout == TTR("Default")) {
@@ -6008,6 +6011,7 @@ Dictionary EditorNode::drag_resource(const Ref<Resource> &p_res, Control *p_from
 	Control *drag_control = memnew(Control);
 	TextureRect *drag_preview = memnew(TextureRect);
 	Label *label = memnew(Label);
+	label->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
 	label->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 
 	Ref<Texture2D> preview;
@@ -6061,6 +6065,7 @@ Dictionary EditorNode::drag_files_and_dirs(const Vector<String> &p_paths, Contro
 		HBoxContainer *hbox = memnew(HBoxContainer);
 		TextureRect *icon = memnew(TextureRect);
 		Label *label = memnew(Label);
+		label->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
 		label->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 
 		if (p_paths[i].ends_with("/")) {
@@ -6079,6 +6084,7 @@ Dictionary EditorNode::drag_files_and_dirs(const Vector<String> &p_paths, Contro
 
 	if (p_paths.size() > num_rows) {
 		Label *label = memnew(Label);
+		label->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
 		if (has_file && has_folder) {
 			label->set_text(vformat(TTR("%d more files or folders"), p_paths.size() - num_rows));
 		} else if (has_folder) {
@@ -7063,6 +7069,34 @@ void EditorNode::set_unfocused_low_processor_usage_mode_enabled(bool p_enabled) 
 	unfocused_low_processor_usage_mode_enabled = p_enabled;
 }
 
+#ifdef ANDROID_ENABLED
+void EditorNode::_touch_actions_panel_mode_changed() {
+	int panel_mode = EDITOR_GET("interface/touchscreen/touch_actions_panel");
+	switch (panel_mode) {
+		case 1:
+			if (touch_actions_panel != nullptr) {
+				touch_actions_panel->queue_free();
+			}
+			touch_actions_panel = memnew(TouchActionsPanel);
+			main_hbox->call_deferred("add_child", touch_actions_panel);
+			break;
+		case 2:
+			if (touch_actions_panel != nullptr) {
+				touch_actions_panel->queue_free();
+			}
+			touch_actions_panel = memnew(TouchActionsPanel);
+			call_deferred("add_child", touch_actions_panel);
+			break;
+		case 0:
+			if (touch_actions_panel != nullptr) {
+				touch_actions_panel->queue_free();
+				touch_actions_panel = nullptr;
+			}
+			break;
+	}
+}
+#endif
+
 EditorNode::EditorNode() {
 	DEV_ASSERT(!singleton);
 	singleton = this;
@@ -7109,7 +7143,6 @@ EditorNode::EditorNode() {
 
 	SceneState::set_disable_placeholders(true);
 	ResourceLoader::clear_translation_remaps(); // Using no remaps if in editor.
-	ResourceLoader::clear_path_remaps();
 	ResourceLoader::set_create_missing_resources_if_class_unavailable(true);
 
 	EditorPropertyNameProcessor *epnp = memnew(EditorPropertyNameProcessor);
@@ -7240,6 +7273,10 @@ EditorNode::EditorNode() {
 		import_image.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_image);
 
+		Ref<ResourceImporterSVG> import_svg;
+		import_svg.instantiate();
+		ResourceFormatImporter::get_singleton()->add_importer(import_svg);
+
 		Ref<ResourceImporterTextureAtlas> import_texture_atlas;
 		import_texture_atlas.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_texture_atlas);
@@ -7368,7 +7405,20 @@ EditorNode::EditorNode() {
 	gui_base->set_end(Point2(0, 0));
 
 	main_vbox = memnew(VBoxContainer);
+
+#ifdef ANDROID_ENABLED
+	main_hbox = memnew(HBoxContainer);
+	main_hbox->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+
+	main_hbox->add_child(main_vbox);
+	main_vbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+
+	_touch_actions_panel_mode_changed();
+
+	gui_base->add_child(main_hbox);
+#else
 	gui_base->add_child(main_vbox);
+#endif
 
 	title_bar = memnew(EditorTitleBar);
 	main_vbox->add_child(title_bar);
@@ -7704,7 +7754,6 @@ EditorNode::EditorNode() {
 		project_title = memnew(Label);
 		project_title->add_theme_font_override(SceneStringName(font), theme->get_font(SNAME("bold"), EditorStringName(EditorFonts)));
 		project_title->add_theme_font_size_override(SceneStringName(font_size), theme->get_font_size(SNAME("bold_size"), EditorStringName(EditorFonts)));
-		project_title->set_focus_mode(Control::FOCUS_NONE);
 		project_title->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
 		project_title->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
 		project_title->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -7952,14 +8001,6 @@ EditorNode::EditorNode() {
 
 	_update_layouts_menu();
 
-#ifdef ANDROID_ENABLED
-	// Add TouchActionsPanel node.
-	bool is_enabled = EDITOR_GET("interface/touchscreen/enable_touch_actions_panel");
-	if (is_enabled) {
-		add_child(memnew(TouchActionsPanel));
-	}
-#endif
-
 	// Bottom panels.
 
 	bottom_panel = memnew(EditorBottomPanel);
@@ -8012,6 +8053,7 @@ EditorNode::EditorNode() {
 	{
 		VBoxContainer *vbox = memnew(VBoxContainer);
 		install_android_build_template_message = memnew(Label);
+		install_android_build_template_message->set_focus_mode(Control::FOCUS_ACCESSIBILITY);
 		install_android_build_template_message->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 		install_android_build_template_message->set_custom_minimum_size(Size2(300 * EDSCALE, 1));
 		vbox->add_child(install_android_build_template_message);
@@ -8100,6 +8142,7 @@ EditorNode::EditorNode() {
 		vbc->add_child(dl);
 
 		disk_changed_list = memnew(Tree);
+		disk_changed_list->set_accessibility_name(TTRC("The following files are newer on disk:"));
 		vbc->add_child(disk_changed_list);
 		disk_changed_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 
