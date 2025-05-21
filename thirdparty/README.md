@@ -62,7 +62,7 @@ Files extracted from upstream source:
 ## astcenc
 
 - Upstream: https://github.com/ARM-software/astc-encoder
-- Version: 4.8.0 (0d6c9047c5ad19640e2d60fdb8f11a16675e7938, 2024)
+- Version: 5.3.0 (bf32abd05eccaf3042170b2a85cebdf0bfee5873, 2025)
 - License: Apache 2.0
 
 Files extracted from upstream source:
@@ -80,17 +80,16 @@ Files extracted from upstream source:
 Files extracted from upstream source:
 
 - `encoder/` and `transcoder/` folders, with the following files removed from `encoder`:
-  `jpgd.{cpp,h}`, `3rdparty/{qoi.h,tinydds.h,tinyexr.cpp,tinyexr.h}`
+  `3rdparty/{qoi.h,tinydds.h,tinyexr.cpp,tinyexr.h}`
 - `LICENSE`
 
 Patches:
 
 - `0001-external-zstd-pr344.patch` (GH-73441)
-- `0002-external-jpgd.patch` (GH-88508)
-- `0003-external-tinyexr.patch` (GH-97582)
-- `0004-remove-tinydds-qoi.patch` (GH-97582)
-- `0005-windows-illegal-character.patch` (GH-103968)
-- `0006-ambiguous-calls.patch` (GH-103968)
+- `0002-external-tinyexr.patch` (GH-97582)
+- `0003-remove-tinydds-qoi.patch` (GH-97582)
+- `0004-ambiguous-calls.patch` (GH-103968)
+- `0005-msvc-include-ctype.patch` (GH-106155)
 
 
 ## brotli
@@ -109,8 +108,8 @@ Files extracted from upstream source:
 ## certs
 
 - Upstream: Mozilla, via https://github.com/bagder/ca-bundle
-- Version: git (4d3fe6683f651d96be1bbef316b201e9b33b274d, 2024),
-  generated from mozilla-release changeset b8ea2342548b8571e58f9176d9555ccdb5ec199f
+- Version: git (bcc414c5b5282f9321651bf71dc1e254ae87e3f8, 2025),
+  generated from mozilla-release changeset 60d4997d339bb7ac6d033819ac50dcad4b9be09d
 - License: MPL 2.0
 
 Files extracted from upstream source:
@@ -470,22 +469,6 @@ Files extracted from upstream source:
 - `LICENSE`
 
 
-## jpeg-compressor
-
-- Upstream: https://github.com/richgel999/jpeg-compressor
-- Version: 2.00 (aeb7d3b463aa8228b87a28013c15ee50a7e6fcf3, 2020)
-- License: Public domain or MIT
-
-Files extracted from upstream source:
-
-- `jpgd*.{c,h}`
-- `jpge*.{c,h}`
-
-Patches:
-
-- `0001-clang-fortify-fix.patch` (GH-101927)
-
-
 ## libbacktrace
 
 - Upstream: https://github.com/ianlancetaylor/libbacktrace
@@ -503,6 +486,25 @@ Patches:
 
 - `0001-big-files-support.patch` (GH-100281)
 
+
+## libjpeg-turbo
+
+- Upstream: https://github.com/libjpeg-turbo/libjpeg-turbo
+- Version: git (20ade4dea9589515a69793e447a6c6220b464535, 2024)
+- License: BSD-3-Clause and IJG
+
+Files extracted from upstream source:
+
+- `src/*.{c,h}` except for:
+  * `cdjpeg.c cjpeg.c djpeg.c example.c jcdiffct.c jclhuff.c jclossls.c jcstest.c jddiffct.c jdlhuff.c jdlossls.c jlossls.h jpegtran.c rdbmp.c rdcolmap.c rdgif.c rdjpgcom.c rdppm.c rdswitch.c rdtarga.c strtest.c tjbench.c tjcomp.c tjdecomp.c tjtran.c tjunittest.c tjutil.c wrbmp.c wrgif.c wrjpgcom.c wrppm.c wrtarga.c`
+- `LICENSE.md`
+- `README.ijg`
+
+Patches:
+
+- `0001-cmake-generated-headers.patch` (GH-104347)
+- `0002-disable-16bitlossless.patch` (GH-104347)
+- `0003-remove-bmp-ppm-support.patch` (GH-104347)
 
 ## libktx
 
@@ -634,8 +636,8 @@ File extracted from upstream release tarball:
 - The `LICENSE` file (edited to keep only the Apache 2.0 variant)
 - Added 2 files `godot_core_mbedtls_platform.c` and `godot_core_mbedtls_config.h`
   providing configuration for light bundling with core
-- Added the file `godot_module_mbedtls_config.h` to customize the build
-  configuration when bundling the full library
+- Added 2 files `godot_module_mbedtls_config.h` and `threading_alt.h`
+  to customize the build configuration when bundling the full library
 
 Patches:
 
@@ -790,7 +792,7 @@ Collection of single-file libraries used in Godot components.
     - `polypartition-0002-shadow-warning.patch` (GH-66808)
 - `qoa.{c,h}`
   * Upstream: https://github.com/phoboslab/qoa
-  * Version: git (a2d927f8ce78a85e903676a33e0f956e53b89f7d, 2024)
+  * Version: git (ae07b57deb98127a5b40916cb57775823d7437d2, 2025)
   * License: MIT
   * Modifications: Added implementation through `qoa.c`.
 - `r128.{c,h}`

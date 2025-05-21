@@ -2084,6 +2084,10 @@ void RuntimeNodeSelect::_update_selection() {
 			continue;
 		}
 
+		if (!ci->is_inside_tree()) {
+			continue;
+		}
+
 		Transform2D xform;
 		// Cameras (overridden or not) don't affect `CanvasLayer`s.
 		if (root->is_canvas_transform_override_enabled() && !(ci->get_canvas_layer_node() && !ci->get_canvas_layer_node()->is_following_viewport())) {
@@ -2129,6 +2133,10 @@ void RuntimeNodeSelect::_update_selection() {
 		if (!node_3d) {
 			selected_3d_nodes.erase(id);
 			--KV;
+			continue;
+		}
+
+		if (!node_3d->is_inside_tree()) {
 			continue;
 		}
 
@@ -2188,11 +2196,6 @@ void RuntimeNodeSelect::_update_selection() {
 		RS::get_singleton()->instance_set_transform(sb->instance_ofs, t_offset);
 		RS::get_singleton()->instance_set_transform(sb->instance_xray, t);
 		RS::get_singleton()->instance_set_transform(sb->instance_xray_ofs, t_offset);
-
-		RS::get_singleton()->instance_reset_physics_interpolation(sb->instance);
-		RS::get_singleton()->instance_reset_physics_interpolation(sb->instance_ofs);
-		RS::get_singleton()->instance_reset_physics_interpolation(sb->instance_xray);
-		RS::get_singleton()->instance_reset_physics_interpolation(sb->instance_xray_ofs);
 	}
 #endif // _3D_DISABLED
 }
