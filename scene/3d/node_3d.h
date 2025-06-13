@@ -51,6 +51,7 @@ class Node3D : public Node {
 	GDCLASS(Node3D, Node);
 
 	friend class SceneTreeFTI;
+	friend class SceneTreeFTITests;
 
 public:
 	// Edit mode for the rotation.
@@ -133,6 +134,9 @@ private:
 		bool notify_local_transform : 1;
 		bool notify_transform : 1;
 
+		bool notify_transform_requested : 1;
+		bool notify_transform_when_fti_off : 1;
+
 		bool visible : 1;
 		bool disable_scale : 1;
 
@@ -143,6 +147,8 @@ private:
 		bool fti_on_tick_property_list : 1;
 		bool fti_global_xform_interp_set : 1;
 		bool fti_frame_xform_force_update : 1;
+		bool fti_is_identity_xform : 1;
+		bool fti_processed : 1;
 
 		RID visibility_parent;
 
@@ -195,6 +201,9 @@ protected:
 	// or requires an update in terms of interpolation
 	// (e.g. changing Camera zoom even if position hasn't changed).
 	void fti_notify_node_changed(bool p_transform_changed = true);
+
+	void _set_notify_transform_when_fti_off(bool p_enable);
+	virtual void _physics_interpolated_changed() override;
 
 	// Opportunity after FTI to update the servers
 	// with global_transform_interpolated,

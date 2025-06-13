@@ -280,6 +280,7 @@ static const int EXPORT_FORMAT_AAB = 1;
 
 static const char *APK_ASSETS_DIRECTORY = "assets";
 static const char *AAB_ASSETS_DIRECTORY = "assetPackInstallTime/src/main/assets";
+static const char *INSTANT_APP_ASSETS_DIRECTORY = "assets"; // instant build doesn't support installTime assetspacks, so using the same directory as APK
 
 static const int DEFAULT_MIN_SDK_VERSION = 24; // Should match the value in 'platform/android/java/app/config.gradle#minSdk'
 static const int DEFAULT_TARGET_SDK_VERSION = 35; // Should match the value in 'platform/android/java/app/config.gradle#targetSdk'
@@ -524,6 +525,12 @@ String EditorExportPlatformAndroid::get_valid_basename(const Ref<EditorExportPre
 
 String EditorExportPlatformAndroid::get_assets_directory(const Ref<EditorExportPreset> &p_preset, int p_export_format) const {
 	String gradle_build_directory = ExportTemplateManager::get_android_build_directory(p_preset);
+
+	bool google_play_instant_build = p_preset->get("gradle_build/google_play_instant");
+	if (google_play_instant_build) {
+		return gradle_build_directory.path_join(INSTANT_APP_ASSETS_DIRECTORY); // Always use base APK asset format
+	}
+
 	return gradle_build_directory.path_join(p_export_format == EXPORT_FORMAT_AAB ? AAB_ASSETS_DIRECTORY : APK_ASSETS_DIRECTORY);
 }
 
@@ -714,6 +721,7 @@ Vector<PluginConfigAndroid> EditorExportPlatformAndroid::get_plugins() {
 
 		if (!plugins_filenames.is_empty()) {
 			Ref<ConfigFile> config_file;
+			config_file.instantiate();
 			for (int i = 0; i < plugins_filenames.size(); i++) {
 				PluginConfigAndroid config = PluginConfigAndroid::load_plugin_config(config_file, plugins_dir.path_join(plugins_filenames[i]));
 				if (config.valid_config) {
@@ -993,10 +1001,19 @@ void EditorExportPlatformAndroid::_get_manifest_info(const Ref<EditorExportPrese
 
 void EditorExportPlatformAndroid::_write_tmp_manifest(const Ref<EditorExportPreset> &p_preset, bool p_give_internet, bool p_debug) {
 	print_verbose("Building temporary manifest...");
+
+	bool google_play_instant_build = (bool)p_preset->get("gradle_build/google_play_instant");
+
 	String manifest_text =
 			"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
 			"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
-			"    xmlns:tools=\"http://schemas.android.com/tools\">\n";
+			"    xmlns:tools=\"http://schemas.android.com/tools\"";
+
+	if (google_play_instant_build) {
+		manifest_text += " android:targetSandboxVersion=\"2\" \n    xmlns:dist=\"http://schemas.android.com/apk/distribution\"";
+	}
+
+	manifest_text += ">\n";
 
 	manifest_text += _get_screen_sizes_tag(p_preset);
 	manifest_text += _get_gles_tag();
@@ -1030,6 +1047,7 @@ void EditorExportPlatformAndroid::_write_tmp_manifest(const Ref<EditorExportPres
 	}
 
 	manifest_text += _get_application_tag(Ref<EditorExportPlatform>(this), p_preset, _has_read_write_storage_permission(perms), p_debug, manifest_metadata);
+
 	manifest_text += "</manifest>\n";
 	String manifest_path = ExportTemplateManager::get_android_build_directory(p_preset).path_join(vformat("src/%s/AndroidManifest.xml", (p_debug ? "debug" : "release")));
 
@@ -1037,54 +1055,113 @@ void EditorExportPlatformAndroid::_write_tmp_manifest(const Ref<EditorExportPres
 	store_string_at_path(manifest_path, manifest_text);
 }
 
+bool EditorExportPlatformAndroid::_should_be_transparent(const Ref<EditorExportPreset> &p_preset) const {
+	return (bool)get_project_setting(p_preset, "display/window/per_pixel_transparency/allowed");
+}
+
 void EditorExportPlatformAndroid::_fix_themes_xml(const Ref<EditorExportPreset> &p_preset) {
 	const String themes_xml_path = ExportTemplateManager::get_android_build_directory(p_preset).path_join("res/values/themes.xml");
-	bool enable_swipe_to_dismiss = p_preset->get("gesture/swipe_to_dismiss");
 
 	if (!FileAccess::exists(themes_xml_path)) {
 		print_error("res/values/themes.xml does not exist.");
 		return;
 	}
 
-	String xml_content;
-	Ref<FileAccess> file = FileAccess::open(themes_xml_path, FileAccess::READ);
-	PackedStringArray lines = file->get_as_text().split("\n");
-	file->close();
+	bool should_be_transparent = _should_be_transparent(p_preset);
 
-	// Check if the themes.xml already contains <item name="android:windowSwipeToDismiss"> element.
-	// If found, update its value based on `enable_swipe_to_dismiss`.
-	bool found = false;
-	bool modified = false;
-	for (int i = 0; i < lines.size(); i++) {
-		String line = lines[i];
-		if (line.contains("<item name") && line.contains("\"android:windowSwipeToDismiss\">")) {
-			lines.set(i, vformat("		<item name=\"android:windowSwipeToDismiss\">%s</item>", bool_to_string(enable_swipe_to_dismiss)));
-			found = true;
-			modified = true;
-			break;
-		}
+	// Default/Reserved theme attributes.
+	Dictionary main_theme_attributes;
+	main_theme_attributes["android:windowDrawsSystemBarBackgrounds"] = "false";
+	main_theme_attributes["android:windowSwipeToDismiss"] = bool_to_string(p_preset->get("gesture/swipe_to_dismiss"));
+	main_theme_attributes["android:windowIsTranslucent"] = bool_to_string(should_be_transparent);
+	if (should_be_transparent) {
+		main_theme_attributes["android:windowBackground"] = "@android:color/transparent";
 	}
 
-	// If <item name="android:windowSwipeToDismiss"> is not found and `enable_swipe_to_dismiss` is false:
-	// Add a new <item> element before the closing </style> tag.
-	if (!found && !enable_swipe_to_dismiss) {
-		for (int i = 0; i < lines.size(); i++) {
-			if (lines[i].contains("</style>")) {
-				lines.insert(i, "		<item name=\"android:windowSwipeToDismiss\">false</item>");
-				modified = true;
-				break;
+	Dictionary splash_theme_attributes;
+	splash_theme_attributes["android:windowSplashScreenBackground"] = "@mipmap/icon_background";
+	splash_theme_attributes["windowSplashScreenAnimatedIcon"] = "@mipmap/icon_foreground";
+	splash_theme_attributes["postSplashScreenTheme"] = "@style/GodotAppMainTheme";
+	splash_theme_attributes["android:windowIsTranslucent"] = bool_to_string(should_be_transparent);
+
+	Dictionary custom_theme_attributes = p_preset->get("gradle_build/custom_theme_attributes");
+
+	// Does not override default/reserved theme attributes; skips any duplicates from custom_theme_attributes.
+	for (const Variant &k : custom_theme_attributes.keys()) {
+		String key = k;
+		String value = custom_theme_attributes[k];
+		if (key.begins_with("[splash]")) {
+			String splash_key = key.trim_prefix("[splash]");
+			if (splash_theme_attributes.has(splash_key)) {
+				WARN_PRINT(vformat("Skipped custom_theme_attribute '%s'; this is a reserved attribute configured via other export options or project settings.", splash_key));
+			} else {
+				splash_theme_attributes[splash_key] = value;
+			}
+		} else {
+			if (main_theme_attributes.has(key)) {
+				WARN_PRINT(vformat("Skipped custom_theme_attribute '%s'; this is a reserved attribute configured via other export options or project settings.", key));
+			} else {
+				main_theme_attributes[key] = value;
 			}
 		}
 	}
 
-	// Reconstruct the XML content from the modified lines.
-	if (modified) {
-		xml_content = String("\n").join(lines);
-		store_string_at_path(themes_xml_path, xml_content);
-		print_verbose("Successfully modified " + themes_xml_path + ": " + "\n" + xml_content);
-	} else {
-		print_verbose("No changes needed for " + themes_xml_path);
+	Ref<FileAccess> file = FileAccess::open(themes_xml_path, FileAccess::READ);
+	PackedStringArray lines = file->get_as_text().split("\n");
+	file->close();
+
+	PackedStringArray new_lines;
+	bool inside_main_theme = false;
+	bool inside_splash_theme = false;
+
+	for (int i = 0; i < lines.size(); i++) {
+		String line = lines[i];
+
+		if (line.contains("<style name=\"GodotAppMainTheme\"")) {
+			inside_main_theme = true;
+			new_lines.append(line);
+			continue;
+		}
+		if (line.contains("<style name=\"GodotAppSplashTheme\"")) {
+			inside_splash_theme = true;
+			new_lines.append(line);
+			continue;
+		}
+
+		// Inject GodotAppMainTheme attributes.
+		if (inside_main_theme && line.contains("</style>")) {
+			for (const Variant &attribute : main_theme_attributes.keys()) {
+				String value = main_theme_attributes[attribute];
+				String item_line = vformat("		<item name=\"%s\">%s</item>", attribute, value);
+				new_lines.append(item_line);
+			}
+			new_lines.append(line); // Add </style> in the end.
+			inside_main_theme = false;
+			continue;
+		}
+
+		// Inject GodotAppSplashTheme attributes.
+		if (inside_splash_theme && line.contains("</style>")) {
+			for (const Variant &attribute : splash_theme_attributes.keys()) {
+				String value = splash_theme_attributes[attribute];
+				String item_line = vformat("		<item name=\"%s\">%s</item>", attribute, value);
+				new_lines.append(item_line);
+			}
+			new_lines.append(line); // Add </style> in the end.
+			inside_splash_theme = false;
+			continue;
+		}
+
+		// Add all other lines unchanged.
+		if (!inside_main_theme && !inside_splash_theme) {
+			new_lines.append(line);
+		}
 	}
+
+	// Reconstruct the XML content from the modified lines.
+	String xml_content = String("\n").join(new_lines);
+	store_string_at_path(themes_xml_path, xml_content);
+	print_verbose("Successfully modified " + themes_xml_path + ": " + "\n" + xml_content);
 }
 
 void EditorExportPlatformAndroid::_fix_manifest(const Ref<EditorExportPreset> &p_preset, Vector<uint8_t> &p_manifest, bool p_give_internet) {
@@ -1918,6 +1995,10 @@ void EditorExportPlatformAndroid::get_preset_features(const Ref<EditorExportPres
 	r_features->push_back("etc2");
 	r_features->push_back("astc");
 
+	if (p_preset->get("shader_baker/enabled")) {
+		r_features->push_back("shader_baker");
+	}
+
 	Vector<ABI> abis = get_enabled_abis(p_preset);
 	for (int i = 0; i < abis.size(); ++i) {
 		r_features->push_back(abis[i].arch);
@@ -1950,15 +2031,16 @@ String EditorExportPlatformAndroid::get_export_option_warning(const EditorExport
 			if (!enabled_deprecated_plugins_names.is_empty() && !gradle_build_enabled) {
 				return TTR("\"Use Gradle Build\" must be enabled to use the plugins.");
 			}
-		} else if (p_name == "gradle_build/compress_native_libraries") {
-			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
-			if (bool(p_preset->get("gradle_build/compress_native_libraries")) && !gradle_build_enabled) {
-				return TTR("\"Compress Native Libraries\" is only valid when \"Use Gradle Build\" is enabled.");
-			}
 		} else if (p_name == "gradle_build/export_format") {
 			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
 			if (int(p_preset->get("gradle_build/export_format")) == EXPORT_FORMAT_AAB && !gradle_build_enabled) {
 				return TTR("\"Export AAB\" is only valid when \"Use Gradle Build\" is enabled.");
+			}
+		} else if (p_name == "gradle_build/google_play_instant") {
+			bool instant_enabled = p_preset->get("gradle_build/google_play_instant");
+			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
+			if (instant_enabled && !gradle_build_enabled) {
+				return TTR("\"Instant Build\" is only valid when \"Use Gradle Build\" is enabled.");
 			}
 		} else if (p_name == "gradle_build/min_sdk") {
 			String min_sdk_str = p_preset->get("gradle_build/min_sdk");
@@ -1999,6 +2081,11 @@ String EditorExportPlatformAndroid::get_export_option_warning(const EditorExport
 					}
 				}
 			}
+		} else if (p_name == "gradle_build/custom_theme_attributes") {
+			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
+			if (bool(p_preset->get("gradle_build/custom_theme_attributes")) && !gradle_build_enabled) {
+				return TTR("\"Use Gradle Build\" is required to add custom theme attributes.");
+			}
 		} else if (p_name == "package/show_in_android_tv") {
 			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
 			if (bool(p_preset->get("package/show_in_android_tv")) && !gradle_build_enabled) {
@@ -2014,6 +2101,13 @@ String EditorExportPlatformAndroid::get_export_option_warning(const EditorExport
 			if (!bool(p_preset->get("package/show_in_app_library")) && !gradle_build_enabled) {
 				return TTR("\"Use Gradle Build\" must be enabled to disable \"Show In App Library\".");
 			}
+		} else if (p_name == "shader_baker/enabled" && bool(p_preset->get("shader_baker/enabled"))) {
+			String export_renderer = GLOBAL_GET("rendering/renderer/rendering_method.mobile");
+			if (OS::get_singleton()->get_current_rendering_method() == "gl_compatibility") {
+				return TTR("\"Shader Baker\" is not supported when using the Compatibility renderer.");
+			} else if (OS::get_singleton()->get_current_rendering_method() != export_renderer) {
+				return vformat(TTR("The editor is currently using a different renderer than what the target platform will use. \"Shader Baker\" won't be able to include core shaders. Switch to the \"%s\" renderer temporarily to fix this."), export_renderer);
+			}
 		}
 	}
 	return String();
@@ -2026,12 +2120,14 @@ void EditorExportPlatformAndroid::get_export_options(List<ExportOption> *r_optio
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gradle_build/use_gradle_build"), false, true, true));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/gradle_build_directory", PROPERTY_HINT_PLACEHOLDER_TEXT, "res://android"), "", false, false));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/android_source_template", PROPERTY_HINT_GLOBAL_FILE, "*.zip"), ""));
-	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gradle_build/compress_native_libraries"), false, false, true));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "gradle_build/export_format", PROPERTY_HINT_ENUM, "Export APK,Export AAB"), EXPORT_FORMAT_APK, false, true));
+	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gradle_build/google_play_instant"), false, true, true));
 	// Using String instead of int to default to an empty string (no override) with placeholder for instructions (see GH-62465).
 	// This implies doing validation that the string is a proper int.
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/min_sdk", PROPERTY_HINT_PLACEHOLDER_TEXT, vformat("%d (default)", DEFAULT_MIN_SDK_VERSION)), "", false, true));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/target_sdk", PROPERTY_HINT_PLACEHOLDER_TEXT, vformat("%d (default)", DEFAULT_TARGET_SDK_VERSION)), "", false, true));
+
+	r_options->push_back(ExportOption(PropertyInfo(Variant::DICTIONARY, "gradle_build/custom_theme_attributes", PROPERTY_HINT_DICTIONARY_TYPE, "String;String"), Dictionary()));
 
 #ifndef DISABLE_DEPRECATED
 	Vector<PluginConfigAndroid> plugins_configs = get_plugins();
@@ -2080,6 +2176,8 @@ void EditorExportPlatformAndroid::get_export_options(List<ExportOption> *r_optio
 
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "graphics/opengl_debug"), false));
 
+	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "shader_baker/enabled"), false));
+
 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "xr_features/xr_mode", PROPERTY_HINT_ENUM, "Regular,OpenXR"), XR_MODE_REGULAR, false, true));
 
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gesture/swipe_to_dismiss"), false));
@@ -2114,6 +2212,7 @@ bool EditorExportPlatformAndroid::get_export_option_visibility(const EditorExpor
 
 	bool advanced_options_enabled = p_preset->are_advanced_options_enabled();
 	if (p_option == "graphics/opengl_debug" ||
+			p_option == "gradle_build/custom_theme_attributes" ||
 			p_option == "command_line/extra_args" ||
 			p_option == "permissions/custom_permissions" ||
 			p_option == "keystore/debug" ||
@@ -2888,7 +2987,8 @@ bool EditorExportPlatformAndroid::has_valid_project_configuration(const Ref<Edit
 		valid = false;
 	}
 
-	if (p_preset->get("gradle_build/use_gradle_build")) {
+	bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
+	if (gradle_build_enabled) {
 		String build_version_path = ExportTemplateManager::get_android_build_directory(p_preset).get_base_dir().path_join(".build_version");
 		Ref<FileAccess> f = FileAccess::open(build_version_path, FileAccess::READ);
 		if (f.is_valid()) {
@@ -2898,6 +2998,12 @@ bool EditorExportPlatformAndroid::has_valid_project_configuration(const Ref<Edit
 				err += vformat(TTR(MISMATCHED_VERSIONS_MESSAGE), installed_version, current_version);
 				err += "\n";
 			}
+		}
+	} else {
+		if (_should_be_transparent(p_preset)) {
+			// Warning only, so don't override `valid`.
+			err += vformat(TTR("\"Use Gradle Build\" is required for transparent background on Android"));
+			err += "\n";
 		}
 	}
 
@@ -3500,7 +3606,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 		String enabled_abi_string = join_abis(enabled_abis, "|", false);
 		String sign_flag = should_sign ? "true" : "false";
 		String zipalign_flag = "true";
-		String compress_native_libraries_flag = bool(p_preset->get("gradle_build/compress_native_libraries")) ? "true" : "false";
+		String play_instant_flag = bool_to_string(p_preset->get("gradle_build/google_play_instant"));
 
 		Vector<String> android_libraries;
 		Vector<String> android_dependencies;
@@ -3575,7 +3681,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 		cmdline.push_back("-Pplugins_maven_repos=" + combined_android_dependencies_maven_repos); // argument to specify the list of maven repos for android dependencies provided by plugins.
 		cmdline.push_back("-Pperform_zipalign=" + zipalign_flag); // argument to specify whether the build should be zipaligned.
 		cmdline.push_back("-Pperform_signing=" + sign_flag); // argument to specify whether the build should be signed.
-		cmdline.push_back("-Pcompress_native_libraries=" + compress_native_libraries_flag); // argument to specify whether the build should compress native libraries.
+		cmdline.push_back("-Pplay_instant_app=" + play_instant_flag); // argument to specify whether the build is for Google Play Instant.
 
 		// NOTE: The release keystore is not included in the verbose logging
 		// to avoid accidentally leaking sensitive information when sharing verbose logs for troubleshooting.
