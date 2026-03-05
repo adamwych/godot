@@ -511,6 +511,7 @@ for tool in custom_tools:
 
 # Add default include paths.
 env.Prepend(CPPPATH=["#"])
+env.Prepend(CPPPATH=["#thirdparty/jolt_physics/"]) # Needed everywhere to access Jolt's deterministic trigonometry funcs.
 
 # configure ENV for platform
 env.platform_exporters = platform_exporters

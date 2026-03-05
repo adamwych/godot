@@ -89,6 +89,7 @@ def configure(env: "SConsEnvironment"):
         env.Append(CCFLAGS=["-arch", "x86_64", "-mmacosx-version-min=10.13"])
         env.Append(LINKFLAGS=["-arch", "x86_64", "-mmacosx-version-min=10.13"])
 
+    env.Append(CCFLAGS=["-ffp-model=precise"])
     env.Append(CCFLAGS=["-ffp-contract=off"])
     env.Append(CCFLAGS=["-fobjc-arc", "-fvisibility=hidden"])
 

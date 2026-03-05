@@ -184,6 +184,7 @@ def configure(env: "SConsEnvironment"):
             env.Append(CCFLAGS=["-fsanitize-recover=memory"])
             env.Append(LINKFLAGS=["-fsanitize=memory"])
 
+    env.Append(CCFLAGS=["-ffp-model=precise"])
     env.Append(CCFLAGS=["-ffp-contract=off"])
 
     if env["library_type"] == "shared_library":

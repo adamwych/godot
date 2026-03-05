@@ -349,7 +349,7 @@ def configure_msvc(env: "SConsEnvironment"):
     if env["arch"] == "x86_32":
         env["x86_libtheora_opt_vc"] = True
 
-    env.Append(CCFLAGS=["/fp:strict"])
+    env.Append(CCFLAGS=["/fp:precise"])
 
     env.AppendUnique(CCFLAGS=["/Gd", "/GR", "/nologo"])
     env.AppendUnique(CCFLAGS=["/utf-8"])  # Force to use Unicode encoding.
@@ -659,6 +659,7 @@ def configure_mingw(env: "SConsEnvironment"):
     if env["arch"] == "x86_32":
         env["x86_libtheora_opt_gcc"] = True
 
+    env.Append(CCFLAGS=["-ffp-model=precise"])
     env.Append(CCFLAGS=["-ffp-contract=off"])
 
     if env["use_llvm"]:
@@ -718,7 +719,7 @@ def configure_mingw(env: "SConsEnvironment"):
         env.Append(LINKFLAGS=["-Wl,--stack," + str(STACK_SIZE)])
 
     ## Compile flags
-
+    
     if not env["use_llvm"]:
         env.Append(CCFLAGS=["-mwindows"])
 

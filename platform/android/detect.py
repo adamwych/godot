@@ -219,6 +219,7 @@ def configure(env: "SConsEnvironment"):
         if has_swappy:
             env.Append(LIBPATH=["#thirdparty/swappy-frame-pacing/arm64-v8a"])
 
+    env.Append(CCFLAGS=["-ffp-model=precise"])
     env.Append(CCFLAGS=["-ffp-contract=off"])
 
     # Link flags

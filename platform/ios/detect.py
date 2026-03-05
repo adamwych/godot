@@ -113,6 +113,7 @@ def configure(env: "SConsEnvironment"):
         env.Append(CCFLAGS=["-miphoneos-version-min=14.0"])
     detect_darwin_sdk_path(env["APPLE_PLATFORM"], env)
 
+    env.Append(CCFLAGS=["-ffp-model=precise"])
     env.Append(CCFLAGS=["-ffp-contract=off"])
 
     if env["arch"] == "x86_64":
