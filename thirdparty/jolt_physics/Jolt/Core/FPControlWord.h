@@ -106,20 +106,20 @@ public:
 	FPControlWord()
 	{
 		uint32 val;
-		asm volatile("vmrs %0, fpscr" : "=r" (val));
+		asm volatile("vmrs %w0, fpscr" : "=r" (val));
 		mPrevState = val;
 		val &= ~Mask;
 		val |= Value;
-		asm volatile("vmsr fpscr, %0" : /* no output */ : "r" (val));
+		asm volatile("vmsr fpscr, %w0" : /* no output */ : "r" (val));
 	}
 
 	~FPControlWord()
 	{
 		uint32 val;
-		asm volatile("vmrs %0, fpscr" : "=r" (val));
+		asm volatile("vmrs %w0, fpscr" : "=r" (val));
 		val &= ~Mask;
 		val |= mPrevState & Mask;
-		asm volatile("vmsr fpscr, %0" : /* no output */ : "r" (val));
+		asm volatile("vmsr fpscr, %w0" : /* no output */ : "r" (val));
 	}
 
 private:
@@ -136,7 +136,7 @@ private:
 
 #else
 
-#error Unsupported CPU architecture
+// #error Unsupported CPU architecture
 
 #endif
 

@@ -125,25 +125,25 @@
 	#else
 		#define JPH_CPU_ARCH_BITS 32
 	#endif
-	#define JPH_USE_SSE
+	// #define JPH_USE_SSE
 	#define JPH_VECTOR_ALIGNMENT 16
 	#define JPH_DVECTOR_ALIGNMENT 32
 
 	// Detect enabled instruction sets
 	#if defined(__AVX512F__) && defined(__AVX512VL__) && defined(__AVX512DQ__) && !defined(JPH_USE_AVX512)
-		#define JPH_USE_AVX512
+		// #define JPH_USE_AVX512
 	#endif
 	#if (defined(__AVX2__) || defined(JPH_USE_AVX512)) && !defined(JPH_USE_AVX2)
-		#define JPH_USE_AVX2
+		// #define JPH_USE_AVX2
 	#endif
 	#if (defined(__AVX__) || defined(JPH_USE_AVX2)) && !defined(JPH_USE_AVX)
-		#define JPH_USE_AVX
+		// #define JPH_USE_AVX
 	#endif
 	#if (defined(__SSE4_2__) || defined(JPH_USE_AVX)) && !defined(JPH_USE_SSE4_2)
-		#define JPH_USE_SSE4_2
+		// #define JPH_USE_SSE4_2
 	#endif
 	#if (defined(__SSE4_1__) || defined(JPH_USE_SSE4_2)) && !defined(JPH_USE_SSE4_1)
-		#define JPH_USE_SSE4_1
+		// #define JPH_USE_SSE4_1
 	#endif
 	#if (defined(__F16C__) || defined(JPH_USE_AVX2)) && !defined(JPH_USE_F16C)
 		#define JPH_USE_F16C
@@ -172,7 +172,7 @@
 	#define JPH_CPU_ARM
 	#if defined(__aarch64__) || defined(_M_ARM64)
 		#define JPH_CPU_ARCH_BITS 64
-		#define JPH_USE_NEON
+		// #define JPH_USE_NEON
 		#define JPH_VECTOR_ALIGNMENT 16
 		#define JPH_DVECTOR_ALIGNMENT 32
 	#else
@@ -203,9 +203,9 @@
 	#define JPH_VECTOR_ALIGNMENT 16
 	#define JPH_DVECTOR_ALIGNMENT 32
 	#ifdef __wasm_simd128__
-		#define JPH_USE_SSE
-		#define JPH_USE_SSE4_1
-		#define JPH_USE_SSE4_2
+		// #define JPH_USE_SSE
+		// #define JPH_USE_SSE4_1
+		// #define JPH_USE_SSE4_2
 	#endif
 #elif defined(__powerpc__) || defined(__powerpc64__)
 	// PowerPC CPU architecture
@@ -239,7 +239,7 @@
 
 	// Compiler flags on e2k arch determine CPU features
 	#if defined(__SSE__) && !defined(JPH_USE_SSE)
-		#define JPH_USE_SSE
+		// #define JPH_USE_SSE
 	#endif
 #else
 	#error Unsupported CPU architecture
