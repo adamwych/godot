@@ -163,6 +163,8 @@ public:
 	// create a body of a given type
 	virtual RID body_create() override;
 
+	virtual int body_get_internal_id(RID p_body) override { return 0; }
+
 	virtual void body_set_space(RID p_body, RID p_space) override;
 	virtual RID body_get_space(RID p_body) const override;
 

@@ -293,6 +293,8 @@ public:
 	//EXBIND2RID(body,BodyMode,bool);
 	EXBIND0R(RID, body_create)
 
+	EXBIND1R(int, body_get_internal_id, RID)
+
 	EXBIND2(body_set_space, RID, RID)
 	EXBIND1RC(RID, body_get_space, RID)
 

@@ -222,6 +222,8 @@ void PhysicsServer3DExtension::_bind_methods() {
 
 	GDVIRTUAL_BIND(_body_create);
 
+	GDVIRTUAL_BIND(_body_get_internal_id, "body");
+
 	GDVIRTUAL_BIND(_body_set_space, "body", "space");
 	GDVIRTUAL_BIND(_body_get_space, "body");
 

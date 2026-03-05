@@ -761,6 +761,8 @@ void PhysicsServer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("area_set_ray_pickable", "area", "enable"), &PhysicsServer3D::area_set_ray_pickable);
 
 	ClassDB::bind_method(D_METHOD("body_create"), &PhysicsServer3D::body_create);
+	
+	ClassDB::bind_method(D_METHOD("body_get_internal_id", "body"), &PhysicsServer3D::body_get_internal_id);
 
 	ClassDB::bind_method(D_METHOD("body_set_space", "body", "space"), &PhysicsServer3D::body_set_space);
 	ClassDB::bind_method(D_METHOD("body_get_space", "body"), &PhysicsServer3D::body_get_space);

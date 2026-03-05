@@ -535,6 +535,12 @@ RID JoltPhysicsServer3D::body_create() {
 	return rid;
 }
 
+int JoltPhysicsServer3D::body_get_internal_id(RID p_body) {
+	JoltBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, -1);
+	return body->get_jolt_id().GetIndexAndSequenceNumber();
+}
+
 void JoltPhysicsServer3D::body_set_space(RID p_body, RID p_space) {
 	JoltBody3D *body = body_owner.get_or_null(p_body);
 	ERR_FAIL_NULL(body);
