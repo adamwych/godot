@@ -64,15 +64,15 @@ inline real_t in(real_t t, real_t b, real_t c, real_t d) {
 
 namespace Sine {
 inline real_t in(real_t t, real_t b, real_t c, real_t d) {
-	return -c * std::cos(t / d * (Math::PI / 2)) + c + b;
+	return -c * Math::cos(t / d * (Math::PI / 2)) + c + b;
 }
 
 inline real_t out(real_t t, real_t b, real_t c, real_t d) {
-	return c * std::sin(t / d * (Math::PI / 2)) + b;
+	return c * Math::sin(t / d * (Math::PI / 2)) + b;
 }
 
 inline real_t in_out(real_t t, real_t b, real_t c, real_t d) {
-	return -c / 2 * (std::cos(Math::PI * t / d) - 1) + b;
+	return -c / 2 * (Math::cos(Math::PI * t / d) - 1) + b;
 }
 
 inline real_t out_in(real_t t, real_t b, real_t c, real_t d) {
@@ -223,7 +223,7 @@ inline real_t in(real_t t, real_t b, real_t c, real_t d) {
 	float a = c * std::pow(2, 10 * t);
 	float s = p / 4;
 
-	return -(a * std::sin((t * d - s) * (2 * Math::PI) / p)) + b;
+	return -(a * Math::sin((t * d - s) * (2 * Math::PI) / p)) + b;
 }
 
 inline real_t out(real_t t, real_t b, real_t c, real_t d) {
@@ -239,7 +239,7 @@ inline real_t out(real_t t, real_t b, real_t c, real_t d) {
 	float p = d * 0.3f;
 	float s = p / 4;
 
-	return (c * std::pow(2, -10 * t) * std::sin((t * d - s) * (2 * Math::PI) / p) + c + b);
+	return (c * std::pow(2, -10 * t) * Math::sin((t * d - s) * (2 * Math::PI) / p) + c + b);
 }
 
 inline real_t in_out(real_t t, real_t b, real_t c, real_t d) {
@@ -258,12 +258,12 @@ inline real_t in_out(real_t t, real_t b, real_t c, real_t d) {
 	if (t < 1) {
 		t -= 1;
 		a *= std::pow(2, 10 * t);
-		return -0.5f * (a * std::sin((t * d - s) * (2 * Math::PI) / p)) + b;
+		return -0.5f * (a * Math::sin((t * d - s) * (2 * Math::PI) / p)) + b;
 	}
 
 	t -= 1;
 	a *= std::pow(2, -10 * t);
-	return a * std::sin((t * d - s) * (2 * Math::PI) / p) * 0.5f + c + b;
+	return a * Math::sin((t * d - s) * (2 * Math::PI) / p) * 0.5f + c + b;
 }
 
 inline real_t out_in(real_t t, real_t b, real_t c, real_t d) {
@@ -418,7 +418,7 @@ namespace Spring {
 inline real_t out(real_t t, real_t b, real_t c, real_t d) {
 	t /= d;
 	real_t s = 1.0 - t;
-	t = (std::sin(t * Math::PI * (0.2 + 2.5 * t * t * t)) * std::pow(s, 2.2) + t) * (1.0 + (1.2 * s));
+	t = (Math::sin(t * Math::PI * (0.2 + 2.5 * t * t * t)) * std::pow(s, 2.2) + t) * (1.0 + (1.2 * s));
 	return c * t + b;
 }
 
