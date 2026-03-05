@@ -86,6 +86,8 @@
 #include "core/io/packed_data_container.h"
 #endif
 
+#include "core/math/math2.h"
+
 static Ref<ResourceFormatSaverBinary> resource_saver_binary;
 static Ref<ResourceFormatLoaderBinary> resource_loader_binary;
 static Ref<ResourceFormatImporter> resource_format_importer;
@@ -321,6 +323,8 @@ void register_core_types() {
 	GDREGISTER_CLASS(InputMap);
 	GDREGISTER_CLASS(Expression);
 	GDREGISTER_CLASS(ProjectSettings);
+
+	GDREGISTER_CLASS(Math2);
 
 	ip = IP::create();
 
